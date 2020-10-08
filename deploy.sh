@@ -3,9 +3,11 @@
 #####################
 ##### FUNCTIONS #####
 #####################
-# json() {
-#     #
-# }
+json() {
+    RESULT=$(jq -r $1 $JSON_FILE)
+    test -z $RESULT && exit 1 # test to ensure that the addresses is not empty string
+    test -z $(seth code $RESULT) && exit 1 # test to ensure that the contract has code
+}
 
 #########################
 ##### ENV VARIABLES #####
@@ -36,16 +38,14 @@ echo # empty line
 echo network=$1
 echo JSON_FILE=$JSON_FILE
 
-VAT=$(jq -r ".MCD_VAT" $JSON_FILE)
-test -z $VAT && exit 1 # test to ensure that the addresses is not empty string
-test -z $(seth code $VAT) && exit 1 # test to ensure that the VAT contract has code
-END=$(jq -r ".MCD_END" $JSON_FILE)
-SPOT=$(jq -r ".MCD_SPOT" $JSON_FILE)
-GEM_JOIN_ETH=$(jq -r ".MCD_JOIN_ETH_A" $JSON_FILE)
-GEM_JOIN_WBTC=$(jq -r ".MCD_JOIN_WBTC_A" $JSON_FILE)
-JUG=$(jq -r ".MCD_JUG" $JSON_FILE)
-OSM_ETH=$(jq -r ".PIP_ETH" $JSON_FILE)
-OSM_WBTC=$(jq -r ".PIP_WBTC" $JSON_FILE)
+json ".MCD_VAT" || VAT=$RESULT
+json ".MCD_END" || END=$RESULT
+json ".MCD_SPOT" || SPOT=$RESULT
+json ".MCD_JOIN_ETH_A" || GEM_JOIN_ETH=$RESULT
+json ".MCD_JOIN_WBTC_A" || GEM_JOIN_WBTC=$RESULT
+json ".MCD_JUG" || JUG=$RESULT
+json ".PIP_ETH" || OSM_ETH=$RESULT
+json ".PIP_WBTC" || OSM_WBTC=$RESULT
 
 echo # empty line
 echo "###### MCD ADDRESSES ######"
