@@ -28,7 +28,6 @@ JSON_FILE=config/$1.json
 ONE_DAY=$(expr 60 \* 60 \* 24)
 ONE_MONTH=$(expr 30 \* $ONE_DAY) # assume 30 days in a month
 FIVE_MONTHS=$(expr 5 \* $ONE_MONTH)
-ZERO_ADDRESS="0x0000000000000000000000000000000000000000"
 
 #####################
 ##### READ JSON #####
@@ -84,9 +83,8 @@ PRICE_FEED=$(dapp create MockPriceFeed)
 ##### DEPLOY BudConnector #####
 ###############################
 # Build project
-cd lib/dss-cdp-manager
-#cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
-
+# cd lib/dss-cdp-manager
+cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
 
 # TODO approve for BudConnector needed
 BUD_CONN_ETH=$(dapp create BudConnector $OSM_ETH $END)
@@ -101,15 +99,16 @@ BUD_CONN_WBTC=$(dapp create BudConnector $OSM_WBTC $END)
 SCORE=$(dapp create BCdpFullScore)
 
 # Deploy JarConnector
-#JAR_CONNECTOR=$(dapp create JarConnector )
-
-# Deploy Jar
 ILK_ETH=$(seth --from-ascii "ETH-A" | seth --to-bytes32)
 ILK_WBTC=$(seth --from-ascii "WBTC-A" | seth --to-bytes32)
+# ctor args = _gemJoins, _ilks, _duration[2]
+JAR_CONNECTOR=$(dapp create JarConnector [$GEM_JOIN_ETH,$GEM_JOIN_WBTC] [$ILK_ETH,$ILK_WBTC] [$ONE_MONTH,$FIVE_MONTHS])
+
+# Deploy Jar
 NOW=$(date "+%s")
 WITHDRAW_TIME_LOCK=$(expr $NOW + $ONE_MONTH) # now + 30 days
 # ctor args = _roundId, _withdrawTimelock, _connector, _vat, _ilks[], _gemJoins[]
-JAR=$(dapp create Jar 1 $WITHDRAW_TIME_LOCK $ZERO_ADDRESS $VAT [$ILK_ETH,$ILK_WBTC] [$GEM_JOIN_ETH,$GEM_JOIN_WBTC])
+JAR=$(dapp create Jar 1 $WITHDRAW_TIME_LOCK $JAR_CONNECTOR $VAT [$ILK_ETH,$ILK_WBTC] [$GEM_JOIN_ETH,$GEM_JOIN_WBTC])
 
 # Deploy Pool
 # ctor args = vat_, jar_, spot_, jug_, dai2usd_
@@ -123,6 +122,8 @@ B_CDP_MANAGER=$(dapp create BCdpManager $VAT $END $POOL $PRICE_FEED $SCORE)
 GET_CDPS=$(dapp create GetCdps)
 
 # SET CONTRACTS
+seth send $JAR_CONNECTOR 'setManager(address)' $B_CDP_MANAGER
+test $(seth call $JAR_CONNECTOR 'man()') = $B_CDP_MANAGER
 seth send $SCORE 'setManager(address)' $B_CDP_MANAGER
 test $(seth call $SCORE 'manager()') = $B_CDP_MANAGER
 
