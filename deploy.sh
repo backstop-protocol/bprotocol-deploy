@@ -5,9 +5,20 @@
 #####################
 json() {
     RESULT=$(jq -r $1 $JSON_FILE)
-    test -z $RESULT && exit 1 # test to ensure that the addresses is not empty string
-    test -z $(seth code $RESULT) && exit 1 # test to ensure that the contract has code
+    test -z $RESULT && echo "$1 not found" && exit 1 # test to ensure that the addresses is not empty string
+    test -z $(seth code $RESULT) && echo "$1 contract code not exit" && exit 1 # test to ensure that the contract has code
 }
+
+equalAddress() {
+    # $1 = Contract address
+    # $2 = view function call, returns address
+    # $3 = expected address
+    # $4 = error message
+    # Convert full 32 bytes address into 160 bytes address format
+    RET=$(seth call $1 $2 | seth --to-dec | seth --to-hex | seth --to-address)
+    test $RET != $3 && echo "$4 \n expected:$3 \n got:$RET" && exit 1
+}
+ 
 
 #########################
 ##### ENV VARIABLES #####
@@ -123,9 +134,7 @@ GET_CDPS=$(dapp create GetCdps)
 
 # SET CONTRACTS
 seth send $JAR_CONNECTOR 'setManager(address)' $B_CDP_MANAGER
-test $(seth call $JAR_CONNECTOR 'man()') = $B_CDP_MANAGER
 seth send $SCORE 'setManager(address)' $B_CDP_MANAGER
-test $(seth call $SCORE 'manager()') = $B_CDP_MANAGER
 
 # Set Pool Params
 seth send $POOL 'setCdpManager(address)' $B_CDP_MANAGER
@@ -138,8 +147,6 @@ seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC $BUD_CONN_WBTC
 # addresses from testchain, indexes 10,11,12,13
 MEMBERS="[0xa71f462b2a7fbba9daf31050c4a82b2084442038,0x654e7b3327634c78bfb21c6010afa29a22d7a605,0xf0117583019f74e7feef294091af7f137d529f10,0x85efdf75b3fa42457e670b43e77dfa58a77799c7]"
 seth send $POOL 'setMembers(address[])' $MEMBERS
-
-#### TODO BCdpManager -> Pool -> Jar -> JarConnector -> BCdpManager
 
 echo # empty line
 echo "###### B.PROTOCOL ADDRESSES ######"
@@ -154,7 +161,23 @@ echo BUD_CONN_WBTC=$BUD_CONN_WBTC
 echo GET_CDPS=$GET_CDPS
 echo MEMBERS=$MEMBERS
 
-# seth call  0x4C46A0Bc85800DFcB5Ae5655D7C35F457EE1AeBE 'manager()' | seth --to-dec | seth --to-hex | seth --to-address
+##########################
+##### VALIDATE SETUP #####
+##########################
+echo "VALIDATING SETUP..."
+echo # empty line
+
+echo "VALIDATING Pool.sol ..."
+equalAddress $POOL 'man()' $B_CDP_MANAGER "ERR:POOL manager not equal"
+
+echo "VALIDATING BCdpFullScore.sol ..."
+equalAddress $SCORE 'manager()' $B_CDP_MANAGER "ERR:SCORE manager not equal"
+
+echo "VALIDATING JarConnector.sol ..."
+equalAddress $JAR_CONNECTOR 'man()' $B_CDP_MANAGER "ERR:JarConnector manager not equal"
+
+echo # empty line
+echo "VERIFICATION SUCCESSFUL"
 
 # back to original folder
 cd ..
