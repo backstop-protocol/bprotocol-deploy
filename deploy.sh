@@ -56,6 +56,8 @@ echo SPOT = $SPOT
 echo GEM_JOIN_ETH = $GEM_JOIN_ETH
 echo GEM_JOIN_WBTC = $GEM_JOIN_WBTC
 echo JUG = $JUG
+echo OSM_ETH = $OSM_ETH
+echo OSM_WBTC = $OSM_WBTC
 echo # empty line
 
 #########################
@@ -63,6 +65,7 @@ echo # empty line
 #########################
 #dapp update
 #dapp --use solc:0.5.16 build
+
 
 ###############################
 ##### DEPLOY DAI2USD DyDx ##### 
@@ -77,12 +80,22 @@ DAI2USD=$(dapp create MockDaiToUsdPriceFeed)
 # TODO If PRICE_FEED not set and network is testnet/testchain deploy new
 PRICE_FEED=$(dapp create MockPriceFeed)
 
-############################
-##### DEPLOY CONTRACTS #####
-############################
+###############################
+##### DEPLOY BudConnector #####
+###############################
 # Build project
 cd lib/dss-cdp-manager
 #cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
+
+
+# TODO approve for BudConnector needed
+BUD_CONN_ETH=$(dapp create BudConnector $OSM_ETH $END)
+BUD_CONN_WBTC=$(dapp create BudConnector $OSM_WBTC $END)
+
+
+############################
+##### DEPLOY CONTRACTS #####
+############################
 
 # Deploy BCdpFullScore
 SCORE=$(dapp create BCdpFullScore)
@@ -116,10 +129,14 @@ test $(seth call $SCORE 'manager()') = $B_CDP_MANAGER
 # Set Pool Params
 seth send $POOL 'setCdpManager(address)' $B_CDP_MANAGER
 seth send $POOL 'setProfitParams(uint256,uint256)' 99 100
-seth send $POOL '(bytes32,bool)' $ILK_ETH true
-seth send $POOL '(bytes32,bool)' $ILK_WBTC true
-seth send $POOL 'setOsm(bytes32,address)' $ILK_ETH 
-seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC 
+seth send $POOL 'setIlk(bytes32,bool)' $ILK_ETH 1
+seth send $POOL 'setIlk(bytes32,bool)' $ILK_WBTC 1
+seth send $POOL 'setOsm(bytes32,address)' $ILK_ETH $BUD_CONN_ETH
+seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC $BUD_CONN_WBTC
+
+# addresses from testchain, indexes 10,11,12,13
+MEMBERS="[0xa71f462b2a7fbba9daf31050c4a82b2084442038,0x654e7b3327634c78bfb21c6010afa29a22d7a605,0xf0117583019f74e7feef294091af7f137d529f10,0x85efdf75b3fa42457e670b43e77dfa58a77799c7]"
+seth send $POOL 'setMembers(address[])' $MEMBERS
 
 #### TODO BCdpManager -> Pool -> Jar -> JarConnector -> BCdpManager
 
@@ -130,8 +147,11 @@ echo SCORE=$SCORE
 echo JAR=$JAR
 echo PRICE_FEED=$PRICE_FEED
 echo B_CDP_MANAGER=$B_CDP_MANAGER
+echo POOL=$POOL
+echo BUD_CONN_ETH=$BUD_CONN_ETH
+echo BUD_CONN_WBTC=$BUD_CONN_WBTC
 echo GET_CDPS=$GET_CDPS
-
+echo MEMBERS=$MEMBERS
 
 # seth call  0x4C46A0Bc85800DFcB5Ae5655D7C35F457EE1AeBE 'manager()' | seth --to-dec | seth --to-hex | seth --to-address
 
