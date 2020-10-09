@@ -2,7 +2,7 @@ json() {
     # $1 = json key to read from json file
     RESULT=$(jq -r $1 $JSON_FILE)
     test -z $RESULT && echo "$1 not found" && exit 1 # test to ensure that the addresses is not empty string
-    test -z $(seth code $RESULT) && echo "$1 contract code not exit" && exit 1 # test to ensure that the contract has code
+    test -z $(seth code $RESULT) && echo "$1 contract code not exist" && exit 1 # test to ensure that the contract has code
 }
 
 expectAddress() {
@@ -50,4 +50,7 @@ reset() {
     export BUD_CONN_ETH=
     export BUD_CONN_WBTC=
     export GET_CDPS=
+
+    export POOL_SETUP_DONE=
+    export MISC_SETUP_DONE=
 }

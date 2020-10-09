@@ -12,7 +12,7 @@ validatePool() {
     toAddress $(seth call $POOL 'members(uint256)' 1) && test $RESULT != $MEMBER_2 && echo "ERR:MEMBER_2" && exit 1
     toAddress $(seth call $POOL 'members(uint256)' 2) && test $RESULT != $MEMBER_3 && echo "ERR:MEMBER_3" && exit 1
     toAddress $(seth call $POOL 'members(uint256)' 3) && test $RESULT != $MEMBER_4 && echo "ERR:MEMBER_4" && exit 1
-    expectInt $POOL 'minArt()' 0 "ERR:minArt" # TODO confirm
+    expectInt $POOL 'minArt()' $(($ONE_MILLION * $ONE_ETH)) "ERR:minArt"
     expectInt $POOL 'shrn()' 99 "ERR:shrn"
     expectInt $POOL 'shrd()' 100 "ERR:shrd"
     expectAddress $POOL 'vat()' $VAT "ERR:POOL-VAT"
@@ -34,6 +34,16 @@ validatePool() {
     
 }
 
+validateBCdpManager() {
+    echo "VALIDATING BCdpManager.sol ..."
+    expectAddress $B_CDP_MANAGER 'owner()' $ETH_FROM "ERR:BCDP-OWNER"
+    expectAddress $B_CDP_MANAGER 'vat()' $VAT "ERR:BCDP-VAT"
+    expectAddress $B_CDP_MANAGER 'end()' $END "ERR:BCDP-END"
+    expectAddress $B_CDP_MANAGER 'pool()' $POOL "ERR:BCDP-POOL"
+    expectAddress $B_CDP_MANAGER 'real()' $PRICE_FEED "ERR:BCDP-REAL"
+    expectAddress $B_CDP_MANAGER 'score()' $SCORE "ERR:BCDP-SCORE"
+}
+
 validateScore() {
     echo "VALIDATING BCdpFullScore.sol ..."
     expectAddress $SCORE 'manager()' $B_CDP_MANAGER "ERR:SCORE manager not equal"
@@ -41,7 +51,20 @@ validateScore() {
 
 validateJarConnector() {
     echo "VALIDATING JarConnector.sol ..."
-    expectAddress $JAR_CONNECTOR 'man()' $B_CDP_MANAGER "ERR:JarConnector manager not equal"
+    # TODO
+    #gemJoins
+    expectAddress $JAR_CONNECTOR 'score()' $SCORE "ERR:JarConnector-SCORE"
+    expectAddress $JAR_CONNECTOR 'man()' $B_CDP_MANAGER "ERR:JarConnector-manager"
+    #ilks
+    #milks
+    #expectAddress $JAR_CONNECTOR 'end(uint256)' 0 $SCORE "ERR:JarConnector-SCORE"
+    #start
+    expectInt $JAR_CONNECTOR 'round()' 1 "ERR:JarConnector-round"
+}
+
+validateJar() {
+    echo "VALIDATING Jar.sol ..."
+    # TODO
 }
 
 validateAll() {
@@ -50,12 +73,14 @@ validateAll() {
     echo # empty line
 
     validateVat
+    validateBCdpManager
     validatePool
     validateScore
+    validateJar
     validateJarConnector
 
     echo # empty line
-    echo "VERIFICATION SUCCESSFUL"
+    echo -e "\e[1;32mVERIFICATION SUCCESSFUL \e[0m"
 }
 
 

@@ -12,7 +12,17 @@ For `testnet`, set the following environment variables
 
 ### Start deployment
 
-    . ./deploy.sh <network>
+    . ./deploy.sh <network> <reset>
+
+#### Example
+
+To deploy contracts on `testchain` network. Script automatically skip if BProtocol contracts are already deployed. However, this is possible only in the same shell environment, as its using environment variables to find the deployment status of the contracts.
+
+    . ./deploy.sh testchain
+
+To reset the deployment. Re-deploy all contracts again.
+
+    . ./deploy.sh testchain reset
 
 Supported network
 

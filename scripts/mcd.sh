@@ -1,7 +1,3 @@
-echo # empty line
-echo network=$1
-echo JSON_FILE=$JSON_FILE
-
 json ".MCD_VAT" || VAT=$RESULT
 json ".MCD_END" || END=$RESULT
 json ".MCD_SPOT" || SPOT=$RESULT

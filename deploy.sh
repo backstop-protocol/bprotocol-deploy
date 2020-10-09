@@ -1,18 +1,29 @@
 #!/usr/bin/env bash
 
+if [ -z $1 ]; then
+    echo "NETWORK NOT FOUND"
+    return 1
+fi
+
+# SETUP ENV VARIABLES
+. scripts/env.sh
+
+# CONFIGURATION
+. scripts/config.sh
+
 # LOAD FUNCTIONS
 . scripts/function.sh
 
 # LOAD VALIDATION FUNCTIONS
 . scripts/validate.sh
 
-# SETUP ENV VARIABLES
-. scripts/env.sh
-
 # READ MCD JSON
 . scripts/mcd.sh
 
-if [ $2 = "reset" ]; then
+# TESTCHAIN SPECIFIC SETUP
+. scripts/testchain.sh
+
+if [ ! -z $2 ] && [ $2 = "reset" ]; then
     reset
 fi
 
@@ -27,8 +38,6 @@ fi
 ##### DEPLOY DAI2USD DyDx ##### 
 ##### and MockPriceFeed   #####
 ###############################
-#TODO Below command
-# test -z $DAI2USD && echo "ERR: DAI2USD contract not set" && exit 1
 # TODO If DAI2USD not set and network is testnet/testchain deploy new
 # TODO Otherwise use the provided address for the mainnet
 
@@ -113,18 +122,44 @@ if [ -z "${GET_CDPS}" ]; then
     export GET_CDPS=$GET_CDPS
 fi
 
+# Deploy UserInfo
+if [ -z "${USER_INFO}" ]; then
+    USER_INFO=$(dapp create UserInfo)
+    export USER_INFO=$USER_INFO
+fi
+
+### DEPLOYMENT DONE ####
+
 # SET CONTRACTS
-seth send $JAR_CONNECTOR 'setManager(address)' $B_CDP_MANAGER
-seth send $SCORE 'setManager(address)' $B_CDP_MANAGER
+if [ -z "${MISC_SETUP_DONE}" ]; then
+    seth send $JAR_CONNECTOR 'setManager(address)' $B_CDP_MANAGER
+    seth send $SCORE 'setManager(address)' $B_CDP_MANAGER
+    seth send $SCORE 'transferOwnership(address)' $JAR_CONNECTOR
+    seth send $JAR_CONNECTOR 'spin()'
+    export MISC_SETUP_DONE=1
+fi
 
 # Set Pool Params
-seth send $POOL 'setCdpManager(address)' $B_CDP_MANAGER
-seth send $POOL 'setProfitParams(uint256,uint256)' 99 100
-seth send $POOL 'setIlk(bytes32,bool)' $ILK_ETH 1
-seth send $POOL 'setIlk(bytes32,bool)' $ILK_WBTC 1
-seth send $POOL 'setOsm(bytes32,address)' $ILK_ETH $BUD_CONN_ETH
-seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC $BUD_CONN_WBTC
-seth send $POOL 'setMembers(address[])' $MEMBERS
+if [ -z "${POOL_SETUP_DONE}" ]; then
+    seth send $POOL 'setCdpManager(address)' $B_CDP_MANAGER
+    seth send $POOL 'setProfitParams(uint256,uint256)' 99 100
+    seth send $POOL 'setIlk(bytes32,bool)' $ILK_ETH 1
+    seth send $POOL 'setIlk(bytes32,bool)' $ILK_WBTC 1
+    seth send $POOL 'setOsm(bytes32,address)' $ILK_ETH $BUD_CONN_ETH
+    seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC $BUD_CONN_WBTC
+    seth send $POOL 'setMinArt(uint256)' $(($ONE_MILLION * $ONE_ETH))
+    seth send $POOL 'setMembers(address[])' $MEMBERS
+    export POOL_SETUP_DONE=1
+fi
+
+# TODO set BudConnector permissions
+# TODO Transfer ownership to MULTISIG
+
+echo -e "\e[1;32mDEPLOYMENT DONE.\e[0m"
+
+# Testchain specific setup
+setupTestchain $NETWORK
+
 
 echo # empty line
 echo "##################################"
@@ -139,6 +174,7 @@ echo B_CDP_MANAGER=$B_CDP_MANAGER
 echo POOL=$POOL
 echo BUD_CONN_ETH=$BUD_CONN_ETH 
 echo BUD_CONN_WBTC=$BUD_CONN_WBTC 
+echo USER_INFO=$USER_INFO
 echo GET_CDPS=$GET_CDPS
 echo MEMBER_1=$MEMBER_1
 echo MEMBER_2=$MEMBER_2
