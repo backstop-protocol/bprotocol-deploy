@@ -26,7 +26,7 @@ validatePool() {
     toBytes32 "WBTC-A" && WBTCA=$RESULT
     # validate ilks
     test $(seth call $POOL 'ilks(bytes32)' $ETHA | seth --to-dec) -ne 1 && echo "ERR:ilks(ETH-A)" && exit 1
-    test $(seth call $POOL 'ilks(bytes32)' $WBTCA | seth --to-dec) -ne 1 && echo "ERR:ilks(ETH-A)" && exit 1
+    test $(seth call $POOL 'ilks(bytes32)' $WBTCA | seth --to-dec) -ne 1 && echo "ERR:ilks(WBTC-A)" && exit 1
 
     # validate osm
     toAddress $(seth call $POOL 'osm(bytes32)' $ETHA) && test $RESULT != $BUD_CONN_ETH && echo "ERR:ETH OSM" && exit 1
@@ -55,8 +55,11 @@ validateJarConnector() {
     #gemJoins
     expectAddress $JAR_CONNECTOR 'score()' $SCORE "ERR:JarConnector-SCORE"
     expectAddress $JAR_CONNECTOR 'man()' $B_CDP_MANAGER "ERR:JarConnector-manager"
-    #ilks
-    #milks
+    test $(seth call $JAR_CONNECTOR 'ilks(uint256)' 0) != $ETHA && echo "ERR:JarConnector-ilks(ETH-A)" && exit 1
+    test $(seth call $JAR_CONNECTOR 'ilks(uint256)' 1) != $WBTCA && echo "ERR:JarConnector-ilks(WBTC-A)" && exit 1
+    
+    test $(seth call $JAR_CONNECTOR 'milks(bytes32)' $ETHA | seth --to-dec) -ne 1 && echo "ERR:JarConnector-ilks(ETH-A)" && exit 1
+    test $(seth call $JAR_CONNECTOR 'milks(bytes32)' $WBTCA | seth --to-dec) -ne 1 && echo "ERR:JarConnector-ilks(WBTC-A)" && exit 1
     #expectAddress $JAR_CONNECTOR 'end(uint256)' 0 $SCORE "ERR:JarConnector-SCORE"
     #start
     expectInt $JAR_CONNECTOR 'round()' 1 "ERR:JarConnector-round"
