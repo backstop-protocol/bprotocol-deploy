@@ -58,8 +58,8 @@ fi
 ##### DEPLOY BudConnector #####
 ###############################
 # Build project
-cd lib/dss-cdp-manager
-# cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
+# cd lib/dss-cdp-manager
+cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
 
 # TODO approve for BudConnector needed
 if [ -z "${BUD_CONN_ETH}" ]; then
@@ -88,7 +88,7 @@ toBytes32 "ETH-A" && ILK_ETH=$RESULT
 toBytes32 "WBTC-A" && ILK_WBTC=$RESULT
 # ctor args = _gemJoins, _ilks, _duration[2]
 if [ -z "${JAR_CONNECTOR}" ]; then
-    JAR_CONNECTOR=$(dapp create JarConnector [$GEM_JOIN_ETH,$GEM_JOIN_WBTC] [$ILK_ETH,$ILK_WBTC] [$ONE_MONTH,$FIVE_MONTHS])
+    JAR_CONNECTOR=$(dapp create JarConnector [$ILK_ETH,$ILK_WBTC] [$ONE_MONTH,$FIVE_MONTHS])
     export JAR_CONNECTOR=$JAR_CONNECTOR
 fi
 
