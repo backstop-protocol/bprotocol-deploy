@@ -11,9 +11,8 @@ expectAddress() {
     # $3 = expected address
     # $4 = error message
     # Convert full 32 bytes address into 160 bytes address format
-    RET=$(seth call $1 $2)
-    toAddress $RET
-    test $RESULT != $3 && echo "$4 \n expected:$3 \n got:$RESULT" && exit 1
+    RET=$(seth call $1 "$2(address)")
+    test $RET != $3 && echo "$4 \n expected:$3 \n got:$RET" && exit 1
 }
 
 expectInt() {
@@ -21,22 +20,12 @@ expectInt() {
     # $2 = view function
     # $3 = expected int
     # $4 = error message
-    test $(seth call $1 $2 | seth --to-dec) -ne $3 && echo $4 && exit 1
+    test $(seth call $1 "$2(uint256)") -ne $3 && echo $4 && exit 1
 }
 
 toBytes32() {
     # $1 = ascii input
     RESULT=$(seth --from-ascii $1 | seth --to-bytes32)
-}
-
-toInt() {
-    # $1 = hex input
-    RESULT=$(seth --to-dec $1)
-}
-
-toAddress() {
-    # $1 = full 32 bytes hex input
-    RESULT=$(seth --to-dec $1 | seth --to-hex | seth --to-address)
 }
 
 reset() {

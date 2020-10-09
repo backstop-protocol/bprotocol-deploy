@@ -58,8 +58,8 @@ fi
 ##### DEPLOY BudConnector #####
 ###############################
 # Build project
-# cd lib/dss-cdp-manager
-cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
+cd lib/dss-cdp-manager
+# cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
 
 # TODO approve for BudConnector needed
 if [ -z "${BUD_CONN_ETH}" ]; then

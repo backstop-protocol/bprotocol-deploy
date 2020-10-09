@@ -8,10 +8,10 @@ validatePool() {
     expectAddress $POOL 'owner()' $ETH_FROM "ERR:POOL-OWNER"
     expectInt $POOL 'DAI_MARKET_ID()' 3 "ERR:DAI_MARKET_ID"
     # validate members    
-    toAddress $(seth call $POOL 'members(uint256)' 0) && test $RESULT != $MEMBER_1 && echo "ERR:MEMBER_1" && exit 1
-    toAddress $(seth call $POOL 'members(uint256)' 1) && test $RESULT != $MEMBER_2 && echo "ERR:MEMBER_2" && exit 1
-    toAddress $(seth call $POOL 'members(uint256)' 2) && test $RESULT != $MEMBER_3 && echo "ERR:MEMBER_3" && exit 1
-    toAddress $(seth call $POOL 'members(uint256)' 3) && test $RESULT != $MEMBER_4 && echo "ERR:MEMBER_4" && exit 1
+    test $(seth call $POOL 'members(uint256)(address)' 0) != $MEMBER_1 && echo "ERR:MEMBER_1" && exit 1
+    test $(seth call $POOL 'members(uint256)(address)' 1) != $MEMBER_2 && echo "ERR:MEMBER_2" && exit 1
+    test $(seth call $POOL 'members(uint256)(address)' 2) != $MEMBER_3 && echo "ERR:MEMBER_3" && exit 1
+    test $(seth call $POOL 'members(uint256)(address)' 3) != $MEMBER_4 && echo "ERR:MEMBER_4" && exit 1
     expectInt $POOL 'minArt()' $(($ONE_MILLION * $ONE_ETH)) "ERR:minArt"
     expectInt $POOL 'shrn()' 99 "ERR:shrn"
     expectInt $POOL 'shrd()' 100 "ERR:shrd"
@@ -29,8 +29,8 @@ validatePool() {
     test $(seth call $POOL 'ilks(bytes32)' $WBTCA | seth --to-dec) -ne 1 && echo "ERR:ilks(WBTC-A)" && exit 1
 
     # validate osm
-    toAddress $(seth call $POOL 'osm(bytes32)' $ETHA) && test $RESULT != $BUD_CONN_ETH && echo "ERR:ETH OSM" && exit 1
-    toAddress $(seth call $POOL 'osm(bytes32)' $WBTCA) && test $RESULT != $BUD_CONN_WBTC && echo "ERR:WBTC OSM" && exit 1
+    test $(seth call $POOL 'osm(bytes32)(address)' $ETHA) != $BUD_CONN_ETH && echo "ERR:ETH OSM" && exit 1
+    test $(seth call $POOL 'osm(bytes32)(address)' $WBTCA) != $BUD_CONN_WBTC && echo "ERR:WBTC OSM" && exit 1
     
 }
 
