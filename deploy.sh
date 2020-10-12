@@ -58,20 +58,16 @@ fi
 ##### DEPLOY BudConnector #####
 ###############################
 # Build project
-cd lib/dss-cdp-manager
+cd lib/dss-cdp-manager && true
 # cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
 
 # TODO approve for BudConnector needed
 if [ -z "${BUD_CONN_ETH}" ]; then
-    BUD_CONN_ETH=$(dapp create BudConnector $OSM_ETH $END)
+    BUD_CONN_ETH=$(dapp create BudConnector $PIP_ETH)
     export BUD_CONN_ETH=$BUD_CONN_ETH
 fi
 
-if [ -z "${BUD_CONN_WBTC}" ]; then
-    BUD_CONN_WBTC=$(dapp create BudConnector $OSM_WBTC $END)
-    export BUD_CONN_WBTC=$BUD_CONN_WBTC
-fi
-
+# TODO set `setPip`
 
 ############################
 ##### DEPLOY CONTRACTS #####
@@ -95,7 +91,7 @@ fi
 
 # Deploy Jar
 NOW=$(date "+%s")
-WITHDRAW_TIME_LOCK=$(expr $NOW + $ONE_MONTH) # now + 30 days
+WITHDRAW_TIME_LOCK=$(expr $NOW + $SIX_MONTHS) # now + (6 * 30 days)
 # ctor args = _roundId, _withdrawTimelock, _connector, _vat, _ilks[], _gemJoins[]
 if [ -z "${JAR}" ]; then
     JAR=$(dapp create Jar 1 $WITHDRAW_TIME_LOCK $JAR_CONNECTOR $VAT [$ILK_ETH,$ILK_WBTC] [$GEM_JOIN_ETH,$GEM_JOIN_WBTC])
@@ -128,6 +124,21 @@ if [ -z "${USER_INFO}" ]; then
     export USER_INFO=$USER_INFO
 fi
 
+# Deploy GovernanceExecutor
+# ctor args = man_, uint delay_
+if [ -z "${GOV_EXECUTOR}" ]; then
+    GOV_EXECUTOR=$(dapp create GovernanceExecutor $B_CDP_MANAGER $(2 * $ONE_DAY))
+    export GOV_EXECUTOR=$GOV_EXECUTOR
+fi
+
+# Deploy Migrate
+# ctor args = jarConnector_, man_, executor_
+if [ -z "${MIGRATE}" ]; then
+    MIGRATE=$(dapp create Migrate $JAR_CONNECTOR $B_CDP_MANAGER $GOV_EXECUTOR)
+    export MIGRATE=$MIGRATE
+fi
+
+
 ### DEPLOYMENT DONE ####
 
 # SET CONTRACTS
@@ -146,7 +157,7 @@ if [ -z "${POOL_SETUP_DONE}" ]; then
     seth send $POOL 'setIlk(bytes32,bool)' $ILK_ETH 1
     seth send $POOL 'setIlk(bytes32,bool)' $ILK_WBTC 1
     seth send $POOL 'setOsm(bytes32,address)' $ILK_ETH $BUD_CONN_ETH
-    seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC $BUD_CONN_WBTC
+    #seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC $BUD_CONN_WBTC
     seth send $POOL 'setMinArt(uint256)' $(($ONE_MILLION * $ONE_ETH))
     seth send $POOL 'setMembers(address[])' $MEMBERS
     export POOL_SETUP_DONE=1
@@ -181,6 +192,8 @@ echo MEMBER_2=$MEMBER_2
 echo MEMBER_3=$MEMBER_3
 echo MEMBER_4=$MEMBER_4
 echo MEMBERS=$MEMBERS
+echo GOV_EXECUTOR=$GOV_EXECUTOR
+echo MIGRATE=$MIGRATE
 echo "##################################"
 
 # VALIDATE DEPLOYMENT

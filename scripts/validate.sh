@@ -30,7 +30,7 @@ validatePool() {
 
     # validate osm
     test $(seth call $POOL 'osm(bytes32)(address)' $ETHA) != $BUD_CONN_ETH && echo "ERR:ETH OSM" && exit 1
-    test $(seth call $POOL 'osm(bytes32)(address)' $WBTCA) != $BUD_CONN_WBTC && echo "ERR:WBTC OSM" && exit 1
+    #test $(seth call $POOL 'osm(bytes32)(address)' $WBTCA) != $BUD_CONN_WBTC && echo "ERR:WBTC OSM" && exit 1
     
 }
 
