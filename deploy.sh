@@ -53,13 +53,22 @@ if [ -z "${PRICE_FEED}" ]; then
     export PRICE_FEED=$PRICE_FEED
 fi
 
+################################
+##### DEPLOY PROXY_ACTIONS #####
+################################
+# cd lib/dss-proxy-actions
+cd lib/dss-proxy-actions && dapp --use solc:0.5.16 build
 
-###############################
-##### DEPLOY BudConnector #####
-###############################
-# Build project
-cd lib/dss-cdp-manager && true
-# cd lib/dss-cdp-manager && dapp --use solc:0.5.16 build
+if [ -z "${B_PROXY_ACTIONS}" ]; then
+    B_PROXY_ACTIONS=$(dapp create BProxyActions)
+    export B_PROXY_ACTIONS=$B_PROXY_ACTIONS
+fi
+
+############################
+##### DEPLOY CONTRACTS #####
+############################
+# cd lib/dss-cdp-manager
+cd ../dss-cdp-manager && dapp --use solc:0.5.16 build
 
 # TODO approve for BudConnector needed
 if [ -z "${BUD_CONN_ETH}" ]; then
@@ -67,11 +76,13 @@ if [ -z "${BUD_CONN_ETH}" ]; then
     export BUD_CONN_ETH=$BUD_CONN_ETH
 fi
 
+if [ -z "${BUD_CONN_WBTC}" ]; then
+    BUD_CONN_WBTC=$(dapp create BudConnector $PIP_WBTC)
+    export BUD_CONN_WBTC=$BUD_CONN_WBTC
+fi
+
 # TODO set `setPip`
 
-############################
-##### DEPLOY CONTRACTS #####
-############################
 
 # Deploy BCdpFullScore
 if [ -z "${SCORE}" ]; then
@@ -126,8 +137,9 @@ fi
 
 # Deploy GovernanceExecutor
 # ctor args = man_, uint delay_
+TWO_DAYS=$(expr 2 \* $ONE_DAY)
 if [ -z "${GOV_EXECUTOR}" ]; then
-    GOV_EXECUTOR=$(dapp create GovernanceExecutor $B_CDP_MANAGER $(2 * $ONE_DAY))
+    GOV_EXECUTOR=$(dapp create GovernanceExecutor $B_CDP_MANAGER $TWO_DAYS)
     export GOV_EXECUTOR=$GOV_EXECUTOR
 fi
 
@@ -147,6 +159,7 @@ if [ -z "${MISC_SETUP_DONE}" ]; then
     seth send $SCORE 'setManager(address)' $B_CDP_MANAGER
     seth send $SCORE 'transferOwnership(address)' $JAR_CONNECTOR
     seth send $JAR_CONNECTOR 'spin()'
+    seth send $GOV_EXECUTOR 'setGovernance(address)' $MIGRATE
     export MISC_SETUP_DONE=1
 fi
 
@@ -157,7 +170,7 @@ if [ -z "${POOL_SETUP_DONE}" ]; then
     seth send $POOL 'setIlk(bytes32,bool)' $ILK_ETH 1
     seth send $POOL 'setIlk(bytes32,bool)' $ILK_WBTC 1
     seth send $POOL 'setOsm(bytes32,address)' $ILK_ETH $BUD_CONN_ETH
-    #seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC $BUD_CONN_WBTC
+    seth send $POOL 'setOsm(bytes32,address)' $ILK_WBTC $BUD_CONN_WBTC
     seth send $POOL 'setMinArt(uint256)' $(($ONE_MILLION * $ONE_ETH))
     seth send $POOL 'setMembers(address[])' $MEMBERS
     export POOL_SETUP_DONE=1
@@ -194,6 +207,7 @@ echo MEMBER_4=$MEMBER_4
 echo MEMBERS=$MEMBERS
 echo GOV_EXECUTOR=$GOV_EXECUTOR
 echo MIGRATE=$MIGRATE
+echo B_PROXY_ACTIONS=$B_PROXY_ACTIONS
 echo "##################################"
 
 # VALIDATE DEPLOYMENT

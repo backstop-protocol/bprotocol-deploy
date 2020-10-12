@@ -70,6 +70,14 @@ validateJar() {
     # TODO
 }
 
+validateGovernanceExecutor() {
+    echo "VALIDATING GovernanceExecutor.sol ..."
+}
+
+validateMigrate() {
+    echo "VALIDATING Migrate.sol ..."
+}
+
 validateAll() {
     echo # empty line
     echo "VALIDATING SETUP..."
@@ -81,6 +89,8 @@ validateAll() {
     validateScore
     validateJar
     validateJarConnector
+    validateGovernanceExecutor
+    validateMigrate
 
     echo # empty line
     echo -e "\e[1;32mVERIFICATION SUCCESSFUL \e[0m"

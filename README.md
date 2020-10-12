@@ -1,5 +1,9 @@
 # bprotocol-deploy
 
+## Build
+
+    dapp update
+
 ## Requirements
 
 For `testchain`, launch the testchain before.
