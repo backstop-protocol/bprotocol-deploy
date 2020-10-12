@@ -23,6 +23,8 @@ fi
 # TESTCHAIN SPECIFIC SETUP
 . scripts/testchain.sh
 
+. scripts/test.sh
+
 if [ ! -z $2 ] && [ $2 = "reset" ]; then
     reset
 fi
@@ -70,7 +72,6 @@ fi
 # cd lib/dss-cdp-manager
 cd ../dss-cdp-manager && dapp --use solc:0.5.16 build
 
-# TODO approve for BudConnector needed
 if [ -z "${BUD_CONN_ETH}" ]; then
     BUD_CONN_ETH=$(dapp create BudConnector $PIP_ETH)
     export BUD_CONN_ETH=$BUD_CONN_ETH
@@ -80,8 +81,6 @@ if [ -z "${BUD_CONN_WBTC}" ]; then
     BUD_CONN_WBTC=$(dapp create BudConnector $PIP_WBTC)
     export BUD_CONN_WBTC=$BUD_CONN_WBTC
 fi
-
-# TODO set `setPip`
 
 
 # Deploy BCdpFullScore
@@ -153,13 +152,29 @@ fi
 
 ### DEPLOYMENT DONE ####
 
-# SET CONTRACTS
+##################################################
+##### CONTRACT LINKING AND SETTING UP PARAMS #####
+##################################################
 if [ -z "${MISC_SETUP_DONE}" ]; then
+    # Jar, JarConnector, Score
     seth send $JAR_CONNECTOR 'setManager(address)' $B_CDP_MANAGER
     seth send $SCORE 'setManager(address)' $B_CDP_MANAGER
     seth send $SCORE 'transferOwnership(address)' $JAR_CONNECTOR
     seth send $JAR_CONNECTOR 'spin()'
+
+    # Governance
     seth send $GOV_EXECUTOR 'setGovernance(address)' $MIGRATE
+
+    # BudConnector
+    seth send $BUD_CONN_ETH 'authorize(address)' $POOL
+    seth send $BUD_CONN_ETH 'authorize(address)' $B_CDP_MANAGER
+    seth send $BUD_CONN_WBTC 'authorize(address)' $POOL
+    seth send $BUD_CONN_WBTC 'authorize(address)' $B_CDP_MANAGER
+
+    # BudConnector `setPip`
+    seth send $BUD_CONN_ETH 'setPip(address,bytes32)' $PIP_ETH $ILK_ETH
+    seth send $BUD_CONN_WBTC 'setPip(address,bytes32)' $PIP_WBTC $ILK_WBTC
+
     export MISC_SETUP_DONE=1
 fi
 
@@ -176,7 +191,6 @@ if [ -z "${POOL_SETUP_DONE}" ]; then
     export POOL_SETUP_DONE=1
 fi
 
-# TODO set BudConnector permissions
 # TODO Transfer ownership to MULTISIG
 
 echo -e "\e[1;32mDEPLOYMENT DONE.\e[0m"
