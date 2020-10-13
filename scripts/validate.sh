@@ -78,6 +78,12 @@ validateMigrate() {
     echo "VALIDATING Migrate.sol ..."
 }
 
+validateOSM() {
+    echo "VALIDATING OSM contracts ..."
+    test $(seth call $PIP_ETH 'bud(address)' $BUD_CONN_ETH) -ne 1 && echo "ERR:OSM-ETH-BUD" && exit 1
+    test $(seth call $PIP_WBTC 'bud(address)' $BUD_CONN_WBTC) -ne 1 && echo "ERR:OSM-WBTC-BUD" && exit 1
+}
+
 validateAll() {
     echo # empty line
     echo "VALIDATING SETUP..."
@@ -91,6 +97,7 @@ validateAll() {
     validateJarConnector
     validateGovernanceExecutor
     validateMigrate
+    validateOSM
 
     echo # empty line
     echo -e "\e[1;32mVERIFICATION SUCCESSFUL \e[0m"

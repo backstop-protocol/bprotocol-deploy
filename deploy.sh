@@ -165,6 +165,11 @@ if [ -z "${MISC_SETUP_DONE}" ]; then
     # Governance
     seth send $GOV_EXECUTOR 'setGovernance(address)' $MIGRATE
 
+    export MISC_SETUP_DONE=1
+fi
+
+# BudConnector Setup
+if [ -z "${BUD_SETUP_DONE}" ]; then
     # BudConnector
     seth send $BUD_CONN_ETH 'authorize(address)' $POOL
     seth send $BUD_CONN_ETH 'authorize(address)' $B_CDP_MANAGER
@@ -175,7 +180,10 @@ if [ -z "${MISC_SETUP_DONE}" ]; then
     seth send $BUD_CONN_ETH 'setPip(address,bytes32)' $PIP_ETH $ILK_ETH
     seth send $BUD_CONN_WBTC 'setPip(address,bytes32)' $PIP_WBTC $ILK_WBTC
 
-    export MISC_SETUP_DONE=1
+    # OSM.kiss
+    seth send $PIP_ETH 'kiss(address)' $BUD_CONN_ETH
+    seth send $PIP_WBTC 'kiss(address)' $BUD_CONN_WBTC
+    export BUD_SETUP_DONE=1
 fi
 
 # Set Pool Params

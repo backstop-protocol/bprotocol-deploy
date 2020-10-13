@@ -3,9 +3,9 @@
 ##### Launch BProtocol snapshot #####
 
 # Read bprotocol snapshot from folder, error if not present
-cp snapshots/bprotocol.tgz ./lib/testchain/snapshots
+cp snapshots/$1.tgz ./lib/testchain/snapshots
 
 # Launch snapshot
 cd ./lib/testchain
-./scripts/launch -s bprotocol
+./scripts/launch -s $1
 
