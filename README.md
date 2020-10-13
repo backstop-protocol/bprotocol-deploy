@@ -1,33 +1,21 @@
 # bprotocol-deploy
 
-## Build
+## Update
 
     dapp update
 
-## Requirements
+### Launch existing BProtocol snapshot
 
-For `testchain`, launch the testchain before.
+Command launch BProtocol snapshot which is already created and present in the folder `snapshots/bprotocol.tgz`
 
-For `testnet`, set the following environment variables
+    sh launch.sh
 
-    export ETH_FROM=0x16Fb96a5fa0427Af0C8F7cF1eB4870231c8154B6
+### Build BProtocol Snapshot from scratch
 
-    export ETH_RPC_URL=127.0.0.1:2000
+Command deploy MCD from scratch and then deploys BProtocol contracts. This should be used when you want to modify the snapshot. Otherwise, use the `launch.sh` script to launch the already created snapshot.
 
-### Start deployment
+    sh build.sh
 
-    . ./deploy.sh <network> <reset>
-
-#### Example
-
-To deploy contracts on `testchain` network. Script automatically skip if BProtocol contracts are already deployed. However, this is possible only in the same shell environment, as its using environment variables to find the deployment status of the contracts.
-
-    . ./deploy.sh testchain
-
-To reset the deployment. Re-deploy all contracts again.
-
-    . ./deploy.sh testchain reset
-
-Supported network
+#### Supported network
 
     testchain

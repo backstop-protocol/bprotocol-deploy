@@ -6,7 +6,7 @@ export SOLC_FLAGS="--optimize optimize-runs=200"
 export ETH_RPC_ACCOUNTS=yes
 export SETH_ASYNC=no
 
-JSON_FILE=config/$1.json
+JSON_FILE=config/mcd_$1.json
 echo JSON_FILE=$JSON_FILE
 export JSON_FILE=$JSON_FILE
 
