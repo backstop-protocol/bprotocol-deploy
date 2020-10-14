@@ -37,3 +37,5 @@ config/testchain_deploy_config.json: This config file is used by the `testchain`
 config/mcd_testchain.json: MCD snapshot has these contracts deployed.
 
 config/bprotocol_testchain.json: BProtocol snapshot has these contracts deployed.
+
+config/ganache.log: Contains EOA addresses used to launch the Ganache and the bprotocol snapshot
