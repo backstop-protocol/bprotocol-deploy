@@ -28,6 +28,10 @@ toBytes32() {
     RESULT=$(seth --from-ascii $1 | seth --to-bytes32)
 }
 
+verifyDeploy() {
+    test $1 = "0x" || test -z $1 && exit 1
+}
+
 reset() {
     export DAI2USD=
     export SCORE=
@@ -39,6 +43,7 @@ reset() {
     export BUD_CONN_ETH=
     export BUD_CONN_WBTC=
     export GET_CDPS=
+    export WBTC=
 
     export POOL_SETUP_DONE=
     export MISC_SETUP_DONE=

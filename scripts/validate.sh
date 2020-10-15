@@ -13,8 +13,8 @@ validatePool() {
     test $(seth call $POOL 'members(uint256)(address)' 2) != $MEMBER_3 && echo "ERR:MEMBER_3" && exit 1
     test $(seth call $POOL 'members(uint256)(address)' 3) != $MEMBER_4 && echo "ERR:MEMBER_4" && exit 1
     expectInt $POOL 'minArt()' $(($ONE_MILLION * $ONE_ETH)) "ERR:minArt"
-    expectInt $POOL 'shrn()' 99 "ERR:shrn"
-    expectInt $POOL 'shrd()' 100 "ERR:shrd"
+    expectInt $POOL 'shrn()' 1065 "ERR:shrn"
+    expectInt $POOL 'shrd()' 1130 "ERR:shrd"
     expectAddress $POOL 'vat()' $VAT "ERR:POOL-VAT"
     expectAddress $POOL 'man()' $B_CDP_MANAGER "ERR:POOL manager not equal"
     expectAddress $POOL 'spot()' $SPOT "ERR:POOL-SPOT"
@@ -80,8 +80,8 @@ validateMigrate() {
 
 validateOSM() {
     echo "VALIDATING OSM contracts ..."
-    test $(seth call $PIP_ETH 'bud(address)' $BUD_CONN_ETH) -ne 1 && echo "ERR:OSM-ETH-BUD" && exit 1
-    test $(seth call $PIP_WBTC 'bud(address)' $BUD_CONN_WBTC) -ne 1 && echo "ERR:OSM-WBTC-BUD" && exit 1
+    test $(seth call $PIP_ETH 'bud(address)' $BUD_CONN_ETH | seth --to-dec) -ne 1 && echo "ERR:OSM-ETH-BUD" && exit 1
+    test $(seth call $PIP_WBTC 'bud(address)' $BUD_CONN_WBTC | seth --to-dec) -ne 1 && echo "ERR:OSM-WBTC-BUD" && exit 1
 }
 
 validateAll() {

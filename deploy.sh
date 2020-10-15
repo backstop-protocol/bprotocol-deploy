@@ -45,25 +45,26 @@ fi
 
 if [ -z "${DAI2USD}" ]; then
     DAI2USD=$(dapp create MockDaiToUsdPriceFeed)
-    export DAI2USD=$DAI2USD
+    verifyDeploy $DAI2USD && export DAI2USD=$DAI2USD
 fi
 
 
 # TODO If PRICE_FEED not set and network is testnet/testchain deploy new
 if [ -z "${PRICE_FEED}" ]; then
     PRICE_FEED=$(dapp create MockPriceFeed)
-    export PRICE_FEED=$PRICE_FEED
+    verifyDeploy $PRICE_FEED && export PRICE_FEED=$PRICE_FEED
 fi
 
 ################################
 ##### DEPLOY PROXY_ACTIONS #####
 ################################
 # cd lib/dss-proxy-actions
-cd lib/dss-proxy-actions && dapp --use solc:0.5.16 build
+# dapp update
+cd lib/dss-proxy-actions #&& dapp --use solc:0.5.16 build
 
 if [ -z "${B_PROXY_ACTIONS}" ]; then
     B_PROXY_ACTIONS=$(dapp create BProxyActions)
-    export B_PROXY_ACTIONS=$B_PROXY_ACTIONS
+    verifyDeploy $B_PROXY_ACTIONS && export B_PROXY_ACTIONS=$B_PROXY_ACTIONS
 fi
 
 ############################
@@ -72,21 +73,23 @@ fi
 # cd lib/dss-cdp-manager
 cd ../dss-cdp-manager && dapp --use solc:0.5.16 build
 
+setupTestchain $NETWORK
+
 if [ -z "${BUD_CONN_ETH}" ]; then
     BUD_CONN_ETH=$(dapp create BudConnector $PIP_ETH)
-    export BUD_CONN_ETH=$BUD_CONN_ETH
+    verifyDeploy $BUD_CONN_ETH && export BUD_CONN_ETH=$BUD_CONN_ETH
 fi
 
 if [ -z "${BUD_CONN_WBTC}" ]; then
     BUD_CONN_WBTC=$(dapp create BudConnector $PIP_WBTC)
-    export BUD_CONN_WBTC=$BUD_CONN_WBTC
+    verifyDeploy $BUD_CONN_WBTC && export BUD_CONN_WBTC=$BUD_CONN_WBTC
 fi
 
 
 # Deploy BCdpFullScore
 if [ -z "${SCORE}" ]; then
     SCORE=$(dapp create BCdpFullScore)
-    export SCORE=$SCORE
+    verifyDeploy $SCORE && export SCORE=$SCORE
 fi
 
 # Deploy JarConnector
@@ -95,7 +98,7 @@ toBytes32 "WBTC-A" && ILK_WBTC=$RESULT
 # ctor args = _gemJoins, _ilks, _duration[2]
 if [ -z "${JAR_CONNECTOR}" ]; then
     JAR_CONNECTOR=$(dapp create JarConnector [$ILK_ETH,$ILK_WBTC] [$ONE_MONTH,$FIVE_MONTHS])
-    export JAR_CONNECTOR=$JAR_CONNECTOR
+    verifyDeploy $JAR_CONNECTOR && export JAR_CONNECTOR=$JAR_CONNECTOR
 fi
 
 
@@ -105,33 +108,33 @@ WITHDRAW_TIME_LOCK=$(expr $NOW + $SIX_MONTHS) # now + (6 * 30 days)
 # ctor args = _roundId, _withdrawTimelock, _connector, _vat, _ilks[], _gemJoins[]
 if [ -z "${JAR}" ]; then
     JAR=$(dapp create Jar 1 $WITHDRAW_TIME_LOCK $JAR_CONNECTOR $VAT [$ILK_ETH,$ILK_WBTC] [$GEM_JOIN_ETH,$GEM_JOIN_WBTC])
-    export JAR=$JAR
+    verifyDeploy $JAR && export JAR=$JAR
 fi
 
 # Deploy Pool
 # ctor args = vat_, jar_, spot_, jug_, dai2usd_
 if [ -z "${POOL}" ]; then
     POOL=$(dapp create Pool $VAT $JAR $SPOT $JUG $DAI2USD)
-    export POOL=$POOL
+    verifyDeploy $POOL && export POOL=$POOL
 fi
 
 # Deploy  BCdpManager
 # ctor args = vat_, end_, pool_, real_, score_
 if [ -z "${B_CDP_MANAGER}" ]; then
     B_CDP_MANAGER=$(dapp create BCdpManager $VAT $END $POOL $PRICE_FEED $SCORE)
-    export B_CDP_MANAGER=$B_CDP_MANAGER
+    verifyDeploy $B_CDP_MANAGER && export B_CDP_MANAGER=$B_CDP_MANAGER
 fi
 
 # Deploy GetCdps
 if [ -z "${GET_CDPS}" ]; then
     GET_CDPS=$(dapp create GetCdps)
-    export GET_CDPS=$GET_CDPS
+    verifyDeploy $GET_CDPS && export GET_CDPS=$GET_CDPS
 fi
 
 # Deploy UserInfo
 if [ -z "${USER_INFO}" ]; then
-    USER_INFO=$(dapp create UserInfo)
-    export USER_INFO=$USER_INFO
+    USER_INFO=$(dapp create UserInfo $DAI $WETH)
+    verifyDeploy $USER_INFO && export USER_INFO=$USER_INFO
 fi
 
 # Deploy GovernanceExecutor
@@ -139,14 +142,14 @@ fi
 TWO_DAYS=$(expr 2 \* $ONE_DAY)
 if [ -z "${GOV_EXECUTOR}" ]; then
     GOV_EXECUTOR=$(dapp create GovernanceExecutor $B_CDP_MANAGER $TWO_DAYS)
-    export GOV_EXECUTOR=$GOV_EXECUTOR
+    verifyDeploy $GOV_EXECUTOR && export GOV_EXECUTOR=$GOV_EXECUTOR
 fi
 
 # Deploy Migrate
 # ctor args = jarConnector_, man_, executor_
 if [ -z "${MIGRATE}" ]; then
     MIGRATE=$(dapp create Migrate $JAR_CONNECTOR $B_CDP_MANAGER $GOV_EXECUTOR)
-    export MIGRATE=$MIGRATE
+    verifyDeploy $MIGRATE && export MIGRATE=$MIGRATE
 fi
 
 
@@ -189,7 +192,7 @@ fi
 # Set Pool Params
 if [ -z "${POOL_SETUP_DONE}" ]; then
     seth send $POOL 'setCdpManager(address)' $B_CDP_MANAGER
-    seth send $POOL 'setProfitParams(uint256,uint256)' 99 100
+    seth send $POOL 'setProfitParams(uint256,uint256)' 1065 1130 # Liquidator profit 106/113
     seth send $POOL 'setIlk(bytes32,bool)' $ILK_ETH 1
     seth send $POOL 'setIlk(bytes32,bool)' $ILK_WBTC 1
     seth send $POOL 'setOsm(bytes32,address)' $ILK_ETH $BUD_CONN_ETH
@@ -204,8 +207,9 @@ fi
 echo -e "\e[1;32mDEPLOYMENT DONE.\e[0m"
 
 # Testchain specific setup
-setupTestchain $NETWORK
+#setupTestchain $NETWORK
 
+logMCD
 
 echo # empty line
 echo "##################################"
