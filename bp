@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+
+export ETH_FROM=0x16Fb96a5fa0427Af0C8F7cF1eB4870231c8154B6
+export ETH_RPC_URL=127.0.0.1:2000
+export ETH_GAS=7000000
+export SOLC_FLAGS="--optimize optimize-runs=200"
+export ETH_RPC_ACCOUNTS=yes
+export SETH_ASYNC=yes
+
+ONE_ETH=$((10**18))
+
+. ./scripts/function.sh 
+
+JSON_FILE=config/bprotocol_testchain.json
+echo JSON_FILE=$JSON_FILE
+export JSON_FILE=$JSON_FILE
+json ".B_CDP_MANAGER" || B_CDP_MANAGER=$RESULT
+
+JSON_FILE=config/mcd_testchain.json
+echo JSON_FILE=$JSON_FILE
+export JSON_FILE=$JSON_FILE
+json ".MCD_JOIN_ETH_A" || ETH_JOIN=$RESULT
+
+usage="$(basename "$0") <OPTIONS>
+Script to execute operations on B.Protocol.
+The command requires \"seth\" installed and required environment variables set.
+
+where:
+
+OPTIONS:
+   open <ink> <art> :Opens a new CDP with ETH deposit and ART debt.
+"
+
+validInt() {
+   test -z $1 && echo $2 && exit 1
+   test $1 -eq 0 && echo $2 && exit 1
+}
+
+validateTx() {
+   test -z $1 && echo "no transaction id" && exit 1
+   test $(seth receipt $1 status) -eq 0 && echo "$2 TX FAILED: $1" && exit 1
+}
+
+openCdp() {
+   validInt "$1" "invalid ethAmount"
+   validInt "$2" "invalid artAmount"
+   ink=$(expr $1 \* $ONE_ETH)
+   art=$(expr $2 \* $ONE_ETH)
+
+   echo "Opening new CDP from user $ETH_FROM ..."
+   echo "ETHAmount: $1 ETH = $ink"
+   echo "ARTAmount: $2 DAI = $art"
+
+   # BCdpManager.open()
+   toBytes32 "ETH-A" && ILK_ETH=$RESULT
+   cdp=$(seth call $B_CDP_MANAGER 'open(bytes32,address)' $ILK_ETH $ETH_FROM | seth --to-dec)
+   validInt "$cdp" "CDP not created"
+   TX=$(seth send $B_CDP_MANAGER 'open(bytes32,address)' $ILK_ETH $ETH_FROM)
+   validateTx $TX
+   echo "CDP Number created: $cdp"
+
+   # WETH.mint()
+   # TODO mint getting failed
+   gem=$(seth call $ETH_JOIN 'gem()(address)');
+   TX=$(seth send $gem 'mint(uint256)' $ink)
+   echo $TX
+   validateTx $TX "WETH.mint()"
+   bal=$(seth call $gem 'balanceOf(address)' $ETH_FROM)
+   echo bal=$bal
+
+   # WETH.approve()
+   TX=$(seth send $gem 'approve(address,uint256)' $ETH_JOIN $ink)
+   validateTx $TX "WETH.approve()"
+
+   # ethJoin.join()
+   urn=$(seth call $B_CDP_MANAGER 'urns(uint256)(address)' $cdp)
+   TX=$(seth send $ETH_JOIN 'join(address,uint256)' $urn $ink)
+   validateTx $TX "ethJoin.join()"
+
+   # BCdpManager.frob()
+   # TX=$(seth send $B_CDP_MANAGER 'frob(uint256,int256,int256)' $cdp $ink $art)
+}
+
+case "$1" in
+   open)
+      openCdp $2 $3
+      ;;
+   *)
+      echo "$usage"
+      exit 1
+      ;;
+esac
