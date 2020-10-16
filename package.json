@@ -1,0 +1,25 @@
+{
+  "name": "bprotocol-deploy",
+  "version": "1.0.0",
+  "description": "## Update",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/backstop-protocol/bprotocol-deploy.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/backstop-protocol/bprotocol-deploy/issues"
+  },
+  "homepage": "https://github.com/backstop-protocol/bprotocol-deploy#readme",
+  "devDependencies": {
+    "web3": "^1.3.0"
+  }
+}
