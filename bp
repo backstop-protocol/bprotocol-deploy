@@ -12,12 +12,10 @@ ONE_ETH=$((10**18))
 . ./scripts/function.sh 
 
 JSON_FILE=config/bprotocol_testchain.json
-echo JSON_FILE=$JSON_FILE
 export JSON_FILE=$JSON_FILE
 json ".B_CDP_MANAGER" || B_CDP_MANAGER=$RESULT
 
 JSON_FILE=config/mcd_testchain.json
-echo JSON_FILE=$JSON_FILE
 export JSON_FILE=$JSON_FILE
 json ".MCD_JOIN_ETH_A" || ETH_JOIN=$RESULT
 
@@ -62,11 +60,9 @@ openCdp() {
    # WETH.mint()
    # TODO mint getting failed
    gem=$(seth call $ETH_JOIN 'gem()(address)');
-   TX=$(seth send $gem 'mint(uint256)' $ink)
-   echo $TX
+   TX=$(seth send $gem 'deposit()' --value $ink)
    validateTx $TX "WETH.mint()"
    bal=$(seth call $gem 'balanceOf(address)' $ETH_FROM)
-   echo bal=$bal
 
    # WETH.approve()
    TX=$(seth send $gem 'approve(address,uint256)' $ETH_JOIN $ink)
@@ -78,12 +74,30 @@ openCdp() {
    validateTx $TX "ethJoin.join()"
 
    # BCdpManager.frob()
-   # TX=$(seth send $B_CDP_MANAGER 'frob(uint256,int256,int256)' $cdp $ink $art)
+   TX=$(seth send $B_CDP_MANAGER 'frob(uint256,int256,int256)' $cdp $ink $art)
+   echo "Done."
+
+   cdpInfo $cdp
+}
+
+cdpInfo() {
+   cdp=$1
+   echo "CDP Info:"
+   echo "cdp: $cdp"
+   urn=$(seth call $B_CDP_MANAGER 'urns(uint256)(address)' $cdp)
+   echo "urn: $urn"
+   own=$(seth call $B_CDP_MANAGER 'owns(uint256)(address)' $cdp)
+   echo "own: $own"
+   ilk=$(seth call $B_CDP_MANAGER 'ilks(uint256)(bytes32)' $cdp)
+   echo "ilk: $ilk" # TODO convert to string
 }
 
 case "$1" in
    open)
       openCdp $2 $3
+      ;;
+   info)
+      cdpInfo $2
       ;;
    *)
       echo "$usage"
