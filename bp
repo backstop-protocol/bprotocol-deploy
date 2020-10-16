@@ -18,6 +18,7 @@ json ".B_CDP_MANAGER" || B_CDP_MANAGER=$RESULT
 JSON_FILE=config/mcd_testchain.json
 export JSON_FILE=$JSON_FILE
 json ".MCD_JOIN_ETH_A" || ETH_JOIN=$RESULT
+json ".PIP_ETH" || PIP_ETH=$RESULT
 
 usage="$(basename "$0") <OPTIONS>
 Script to execute operations on B.Protocol.
@@ -26,7 +27,8 @@ The command requires \"seth\" installed and required environment variables set.
 where:
 
 OPTIONS:
-   open <ink> <art> :Opens a new CDP with ETH deposit and ART debt.
+   open <ink> <art>     :Opens a new CDP with (ink * 10^18) deposit and (art * 10^18) debt.
+   pokeNext <price>     :Poke next rate (price * 10^18) for PIP_ETH.src()
 "
 
 validInt() {
@@ -42,9 +44,9 @@ validateTx() {
 openCdp() {
    validInt "$1" "invalid ethAmount"
    validInt "$2" "invalid artAmount"
-   ink=$(expr $1 \* $ONE_ETH)
-   art=$(expr $2 \* $ONE_ETH)
-
+   ink=$(echo "$1 * $ONE_ETH" | bc)
+   art=$(echo "$2 * $ONE_ETH" | bc)
+   
    echo "Opening new CDP from user $ETH_FROM ..."
    echo "ETHAmount: $1 ETH = $ink"
    echo "ARTAmount: $2 DAI = $art"
@@ -58,7 +60,6 @@ openCdp() {
    echo "CDP Number created: $cdp"
 
    # WETH.mint()
-   # TODO mint getting failed
    gem=$(seth call $ETH_JOIN 'gem()(address)');
    TX=$(seth send $gem 'deposit()' --value $ink)
    validateTx $TX "WETH.mint()"
@@ -75,6 +76,7 @@ openCdp() {
 
    # BCdpManager.frob()
    TX=$(seth send $B_CDP_MANAGER 'frob(uint256,int256,int256)' $cdp $ink $art)
+   validateTx $TX "BCdpManager.frob()"
    echo "Done."
 
    cdpInfo $cdp
@@ -89,7 +91,43 @@ cdpInfo() {
    own=$(seth call $B_CDP_MANAGER 'owns(uint256)(address)' $cdp)
    echo "own: $own"
    ilk=$(seth call $B_CDP_MANAGER 'ilks(uint256)(bytes32)' $cdp)
-   echo "ilk: $ilk" # TODO convert to string
+   echo "ilk: $(seth --to-ascii $ilk)"
+}
+
+# Change osm price for next hour
+pokeNext() {
+   # Use `bc` for big numbers
+   newPrice=$(echo "$1 * $ONE_ETH" | bc)
+   # Print current rate
+   # PIP_ETH.src()
+   echo "PIP_ETH = $PIP_ETH"
+   value=$(seth call $PIP_ETH 'src()(address)')
+   echo "DSValue = $value"
+   
+   # DSValue.peek()
+   peek=$(seth call $value 'peek()(bytes32)' | seth --to-dec)
+   echo "DSValue.peek() = $peek"
+
+   # DSValue.poke()
+   wut=$(seth --to-uint256 $newPrice | seth --to-bytes32)
+   TX=$(seth send $value 'poke(bytes32)' $wut)
+   validateTx $TX "DSValue.poke()"
+   echo "DSValue.poke() = $newPrice"
+
+   # DSValue.peek()
+   peek=$(seth call $value 'peek()(bytes32)' | seth --to-dec)
+   echo "DSValue.peek() = $peek"
+}
+
+# TODO Advance time (we should calc how much to advance)
+advanceTime() {
+   # Support units like `1 mins / hours / days / weeks`
+   echo "Advance time"
+}
+
+# TODO Change medianizer price
+med() {
+   echo "Med"
 }
 
 case "$1" in
@@ -98,6 +136,12 @@ case "$1" in
       ;;
    info)
       cdpInfo $2
+      ;;
+   pokeNext)
+      pokeNext $2
+      ;;
+   advTime)
+      advanceTime
       ;;
    *)
       echo "$usage"
