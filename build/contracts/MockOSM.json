@@ -1,0 +1,1 @@
+{ "contractName" : "MockOSM", "abi" : [{"constant":true,"inputs":[],"name":"peep","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"},{"internalType":"bool","name":"","type":"bool"}],"payable":false,"stateMutability":"view","type":"function"}] }

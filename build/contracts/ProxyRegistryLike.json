@@ -1,0 +1,1 @@
+{ "contractName" : "ProxyRegistryLike", "abi" : [{"constant":true,"inputs":[{"internalType":"address","name":"u","type":"address"}],"name":"proxies","outputs":[{"internalType":"contract DSProxyLike","name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"}] }

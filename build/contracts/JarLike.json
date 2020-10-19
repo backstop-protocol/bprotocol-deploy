@@ -1,0 +1,1 @@
+{ "contractName" : "JarLike", "abi" : [{"constant":true,"inputs":[],"name":"connector","outputs":[{"internalType":"address","name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"}] }

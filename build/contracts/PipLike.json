@@ -1,0 +1,1 @@
+{ "contractName" : "PipLike", "abi" : [{"constant":true,"inputs":[],"name":"read","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"payable":false,"stateMutability":"view","type":"function"}] }

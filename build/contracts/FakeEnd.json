@@ -1,0 +1,1 @@
+{ "contractName" : "FakeEnd", "abi" : [{"inputs":[],"payable":false,"stateMutability":"nonpayable","type":"constructor"},{"constant":true,"inputs":[],"name":"cat","outputs":[{"internalType":"contract FakeCat","name":"","type":"address"}],"payable":false,"stateMutability":"view","type":"function"}] }
