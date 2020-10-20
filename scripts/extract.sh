@@ -1,10 +1,12 @@
 #!/bin/sh
-
+export SOLC_FLAGS="--optimize optimize-runs=200"
 export DAPP_OUT=../../abi
 cd lib/dss-cdp-manager
 dapp --use solc:0.5.16 build --extract
 
 cd ../..
+
+cp ./lib/testchain/out/mcd/*.abi ./abi
 
 for f in ./abi/*.abi ; do 
     value=$(cat $f)
