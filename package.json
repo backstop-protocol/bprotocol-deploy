@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/backstop-protocol/bprotocol-deploy#readme",
   "devDependencies": {
+    "@openzeppelin/test-helpers": "^0.5.7",
     "web3": "^1.3.0"
   },
   "dependencies": {
