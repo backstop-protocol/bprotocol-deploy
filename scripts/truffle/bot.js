@@ -1,3 +1,9 @@
+const { time } = require("@openzeppelin/test-helpers");
+
+require("@openzeppelin/test-helpers/configure")({
+  provider: "http://localhost:2000",
+});
+
 const BN = require("bn.js");
 
 const abiJSON = require("../../lib/dss-cdp-manager/out/dapp.sol.json");
@@ -114,6 +120,11 @@ async function processBite() {
       const dMemberInk = await pool.bite.call(cdp, avail, 0, {from: MEMBER_1});
       console.log("memberInk: " +dMemberInk);
 
+      // await increaseHalfHour();
+      // await increaseHalfHour();
+      // await osm.poke();
+      // await spot.poke(ILK_ETH);
+
       try{
         // try block to catch failed tx
         await pool.bite(cdp, avail, 0, {from: MEMBER_1});
@@ -126,6 +137,11 @@ async function processBite() {
     }
     cdp++;
   }
+}
+
+async function increaseHalfHour() {
+  // const hop = await osm.hop();
+  await time.increase((3600 / 2) + 1);
 }
 
 async function processTopup(cdp) {

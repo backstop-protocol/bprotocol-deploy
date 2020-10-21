@@ -20,6 +20,7 @@ const GemJoin = artifacts.require("GemJoin");
 const OSM = artifacts.require("OSM");
 const DSValue = artifacts.require("DSValue");
 const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
+const Spotter = artifacts.require("Spotter");
 
 let bCdpManager;
 let dssCdpManager;
@@ -27,6 +28,7 @@ let weth;
 let gemJoin;
 let osm;
 let dai2usd;
+let spot;
 
 let USER_1 = "0xda1495ebd7573d8e7f860862baa3abecebfa02e0";
 
@@ -44,6 +46,7 @@ contract("Testchain", (accounts) => {
     weth = await WETH.at(gem);
     osm = await OSM.at(mcdJSON.PIP_ETH);
     dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
+    spot = await Spotter.at(mcdJSON.MCD_SPOT);
 
     // await init();
   });
@@ -76,9 +79,10 @@ contract("Testchain", (accounts) => {
 
   // 3.
   // it("poke", async () => {
-    // await increaseHalfHour();
-    // await osm.poke();
-    // console.log("Current price: " + (await getCurrentPrice()).toString());
+  //   await increaseHalfHour();
+  //   await osm.poke();
+  //   await spot.poke(ILK_ETH);
+  //   console.log("Current price: " + (await getCurrentPrice()).toString());
   // });
 });
 
