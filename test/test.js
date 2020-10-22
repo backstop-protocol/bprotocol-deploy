@@ -21,6 +21,7 @@ const OSM = artifacts.require("OSM");
 const DSValue = artifacts.require("DSValue");
 const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
 const Spotter = artifacts.require("Spotter");
+const MockPriceFeed = artifacts.require("MockPriceFeed");
 
 let bCdpManager;
 let dssCdpManager;
@@ -29,6 +30,7 @@ let gemJoin;
 let osm;
 let dai2usd;
 let spot;
+let real;
 
 let USER_1 = "0xda1495ebd7573d8e7f860862baa3abecebfa02e0";
 
@@ -47,6 +49,7 @@ contract("Testchain", (accounts) => {
     osm = await OSM.at(mcdJSON.PIP_ETH);
     dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
     spot = await Spotter.at(mcdJSON.MCD_SPOT);
+    real = await MockPriceFeed.at(bpJSON.PRICE_FEED);
 
     // await init();
   });
@@ -73,18 +76,29 @@ contract("Testchain", (accounts) => {
     await time.increase(nextTime);
     await setNextPrice(new BN(145).mul(ONE_ETH));
     await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
+    await real.poke(new BN(145).mul(ONE_ETH));
     console.log("Current price: " + (await getCurrentPrice()).toString());
     await increaseHalfHour();
   });
 
   // 3.
-  // it("poke", async () => {
-  //   await increaseHalfHour();
-  //   await osm.poke();
-  //   await spot.poke(ILK_ETH);
-  //   console.log("Current price: " + (await getCurrentPrice()).toString());
-  // });
+  it("poke", async () => {
+    console.log("waiting.....");
+
+    await sleep(10000);
+
+    await increaseHalfHour();
+    await increaseHalfHour();
+    await real.poke(new BN(145).mul(ONE_ETH));
+    await osm.poke();
+    await spot.poke(ILK_ETH);
+    console.log("Current price: " + (await getCurrentPrice()).toString());
+  });
 });
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function init() {
   const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
@@ -130,39 +144,39 @@ async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
   const ink = new BN(amtInEth).mul(new BN(ONE_ETH));
   const art = new BN(amtInDai).mul(new BN(ONE_ETH));
 
-try{
-  // manager.open();
-  const cdp = await manager.open.call(ILK_ETH, _from, {
-    from: _from,
-  });
-  await manager.open(ILK_ETH, _from, { from: _from });
-
-  // WETH.deposit()
-  await web3.eth.sendTransaction({
-    from: _from,
-    to: weth.address,
-    value: ink,
-  });
-
-  // WETH.approve()
-  await weth.approve(gemJoin.address, ink, { from: _from });
-
-  // ethJoin.join()
-  const urn = await manager.urns(cdp);
-  await gemJoin.join(urn, ink, { from: _from });
-
-  // manager.frob()
-  await manager.frob(cdp, ink, art, { from: _from });
-
-  if (isMove) {
-    // manager.move();
-    await manager.move(cdp, _from, art.mul(RAY), {
+  try {
+    // manager.open();
+    const cdp = await manager.open.call(ILK_ETH, _from, {
       from: _from,
     });
+    await manager.open(ILK_ETH, _from, { from: _from });
+
+    // WETH.deposit()
+    await web3.eth.sendTransaction({
+      from: _from,
+      to: weth.address,
+      value: ink,
+    });
+
+    // WETH.approve()
+    await weth.approve(gemJoin.address, ink, { from: _from });
+
+    // ethJoin.join()
+    const urn = await manager.urns(cdp);
+    await gemJoin.join(urn, ink, { from: _from });
+
+    // manager.frob()
+    await manager.frob(cdp, ink, art, { from: _from });
+
+    if (isMove) {
+      // manager.move();
+      await manager.move(cdp, _from, art.mul(RAY), {
+        from: _from,
+      });
+    }
+  } catch (err) {
+    console.log(err);
   }
-}catch(err) {
-  console.log(err);
-}
 }
 
 async function poke() {
