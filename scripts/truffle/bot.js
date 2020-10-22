@@ -81,6 +81,7 @@ module.exports = async function (callback) {
         address: spot.address,
       },
       async (error, result) => {
+        await processUntop();
         await processBite();
       }
     );
@@ -105,6 +106,38 @@ module.exports = async function (callback) {
     await sleep(100);
   }
 };
+
+async function processUntop() {
+  let cdp = 1;
+  while (true) {
+    try {
+      const exist = await isCdpExists(cdp);
+      if (exist) {
+        // isToppedUp && !isBitten && isSafe
+        const toppedUp = await topped.get(cdp);
+        const isBitten = bitten.get(cdp);
+        console.log("trying UNTOP: " + cdp);
+        console.log("toppedUp: " + cdp + " : " + toppedUp);
+        console.log("isBitten: " + cdp + " : " + isBitten);
+        if (toppedUp && !isBitten) {
+          const info = await liqInfo.getBiteInfo(cdp, MEMBER_1);
+          console.log("UNTOP: " + info);
+          const canCallBiteNow = info[2];
+          if (!canCallBiteNow) {
+            // untop
+            await pool.untop(cdp, { from: MEMBER_1 });
+            console.log("Untopped: " + cdp);
+          }
+        }
+      } else {
+        break;
+      }
+      cdp++;
+    } catch (err) {
+      console.log(err);
+    }
+  }
+}
 
 async function processCdps() {
   let cdp = 1;
@@ -164,9 +197,10 @@ async function processBite() {
 
           const rad = await pool.rad(MEMBER_1);
           await memberWithdraw(rad, { from: MEMBER_1 });
-        }
 
-        bitten.set(cdp, true);
+          console.log("setting bitten: " + cdp);
+          bitten.set(cdp, true);
+        }
       }
     } catch (err) {
       console.log(err);

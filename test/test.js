@@ -32,6 +32,7 @@ let spot;
 let real;
 
 let USER_1 = "0xda1495ebd7573d8e7f860862baa3abecebfa02e0";
+let USER_2 = "0xb76a5a26ba0041eca3edc28a992e4eb65a3b3d05";
 
 let MEMBER_1 = bpJSON.MEMBER_1;
 let MEMBER_2 = bpJSON.MEMBER_2;
@@ -65,12 +66,54 @@ contract("Testchain", (accounts) => {
   // });
 
   // 1.
-  it("Test Bite", async () => {
+    it("Test Bite", async () => {
+      // 1. Mint
+      await mintDaiForUser(2, 199, { from: USER_1 });
+
+      // 2. setNextPrice
+      const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
+      await time.increase(nextTime);
+      await setNextPrice(new BN(145).mul(ONE_ETH));
+      await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
+      await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+      console.log("Current price: " + (await getCurrentPrice()).toString());
+      await increaseHalfHour();
+
+      // 3. It should be topped up at Bot
+
+      // 4. poke
+      console.log("waiting.....");
+      await sleep(10000);
+
+      // await increaseHalfHour();
+      await increaseHalfHour();
+      await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+      await osm.poke();
+      await spot.poke(ILK_ETH);
+      console.log("Current price: " + (await getCurrentPrice()).toString());
+
+      // 5. It should be bitten at Bot
+    });
+
+  it("Test untop", async () => {
+    // 0. Set the price back to original
+    let nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
+      await time.increase(nextTime);
+      await setNextPrice(new BN(150).mul(ONE_ETH));
+      await dai2usd.setPrice(new BN(150).mul(ONE_ETH));
+      await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
+      console.log("Current price: " + (await getCurrentPrice()).toString());
+      await increaseHalfHour();
+    await increaseHalfHour();
+      await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
+      await osm.poke();
+      await spot.poke(ILK_ETH);
+
     // 1.
-    await mintDaiForUser(2, 199, { from: USER_1 });
+    const cdp = await mintDaiForUser(2, 199, { from: USER_2 });
 
     // 2. setNextPrice
-    const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
+    nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
     await time.increase(nextTime);
     await setNextPrice(new BN(145).mul(ONE_ETH));
     await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
@@ -78,17 +121,28 @@ contract("Testchain", (accounts) => {
     console.log("Current price: " + (await getCurrentPrice()).toString());
     await increaseHalfHour();
 
-    // 3.  poke
-    console.log("waiting.....");
+    // 3. It should be topped up at Bot
 
+    console.log("waiting.....");
     await sleep(10000);
 
-    // await increaseHalfHour();
+    // 4. Set 200 next price again
+    await bCdpManager.frob(cdp, -1, 0, {from: USER_2});
+    nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
+    await time.increase(nextTime);
+    await setNextPrice(new BN(200).mul(ONE_ETH));
+    await dai2usd.setPrice(new BN(200).mul(ONE_ETH));
+    await real.poke(uintToBytes32(new BN(200).mul(ONE_ETH)));
+    console.log("Current price: " + (await getCurrentPrice()).toString());
+    await increaseHalfHour();
+
+    // 5. poke
     await increaseHalfHour();
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     await osm.poke();
     await spot.poke(ILK_ETH);
-    console.log("Current price: " + (await getCurrentPrice()).toString());
+
+    // 5. It should be untopped at Bot
   });
 });
 
@@ -125,24 +179,26 @@ async function setupTestchain() {
 }
 
 async function mintDaiForUser(amtInEth, amtInDai, opt) {
-  await mintDai(bCdpManager, amtInEth, amtInDai, false, opt);
+  const cdp = await mintDai(bCdpManager, amtInEth, amtInDai, false, opt);
   console.log("Minted: " + amtInDai + " DAI for USER:" + opt.from);
+  return cdp;
 }
 
 async function mintDaiForMember(amtInEth, amtInDai, opt) {
   const _from = opt.from;
-  await mintDai(dssCdpManager, amtInEth, amtInDai, true, opt);
+  const cdp = await mintDai(dssCdpManager, amtInEth, amtInDai, true, opt);
   console.log("Minted: " + amtInDai + " DAI for MEMBER:" + opt.from);
+  return cdp;
 }
 
 async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
   const _from = opt.from;
   const ink = new BN(amtInEth).mul(new BN(ONE_ETH));
   const art = new BN(amtInDai).mul(new BN(ONE_ETH));
-
+  let cdp;
   try {
     // manager.open();
-    const cdp = await manager.open.call(ILK_ETH, _from, {
+    cdp = await manager.open.call(ILK_ETH, _from, {
       from: _from,
     });
     await manager.open(ILK_ETH, _from, { from: _from });
@@ -173,6 +229,7 @@ async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
   } catch (err) {
     console.log(err);
   }
+  return cdp;
 }
 
 async function poke() {
