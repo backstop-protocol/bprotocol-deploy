@@ -26,6 +26,7 @@ const GemJoin = artifacts.require("GemJoin");
 const WETH = artifacts.require("WETH");
 const Vat = artifacts.require("Vat");
 const Spotter = artifacts.require("Spotter");
+const LiquidatorInfo = artifacts.require("LiquidatorInfo");
 
 // B.Protocol Contracts
 const BCdpManager = artifacts.require("BCdpManager");
@@ -44,6 +45,7 @@ let weth;
 let vat;
 let osm;
 let spot;
+let liqInfo;
 
 let MEMBER_1 = bpJSON.MEMBER_1;
 let MEMBER_2 = bpJSON.MEMBER_2;
@@ -67,17 +69,27 @@ module.exports = async function (callback) {
   spot = await Spotter.at(mcdJSON.MCD_SPOT);
   const gem = await gemJoin.gem();
   weth = await WETH.at(gem);
+  liqInfo = await LiquidatorInfo.at(bpJSON.LIQUIDATORINFO);
 
   try {
     // initialize
     await init();
+
+    const subscription = web3.eth.subscribe(
+      "logs",
+      {
+        address: spot.address,
+      },
+      async (error, result) => {
+        await processBite();
+      }
+    );
 
     web3.eth.subscribe("newBlockHeaders", async (error, event) => {
       try {
         if (!error) {
           console.log("Block: " + event.number);
           await processCdps();
-          await processBite();
         } else {
           console.log(error);
         }
@@ -112,28 +124,28 @@ async function processCdps() {
 async function processBite() {
   let cdp = 1;
   while (true) {
+    const exists = await isCdpExists(cdp);
+    if (!exists) return;
     const toppedUp = await topped.get(cdp);
-    const isBitten = bitten.get(cdp);
-    if(toppedUp && !isBitten) {
-      const avail = await pool.availBite.call(cdp, MEMBER_1, {from: MEMBER_1});
-      console.log("cdp: " + cdp + " avail: "+ avail);
-      const dMemberInk = await pool.bite.call(cdp, avail, 0, {from: MEMBER_1});
-      console.log("memberInk: " +dMemberInk);
 
-      // await increaseHalfHour();
-      // await increaseHalfHour();
-      // await osm.poke();
-      // await spot.poke(ILK_ETH);
-
-      try{
-        // try block to catch failed tx
-        await pool.bite(cdp, avail, 0, {from: MEMBER_1});
-      }catch(err) {
-        console.log(err);
+    if (toppedUp) {
+      const info = await liqInfo.getBiteInfo(cdp, MEMBER_1);
+      console.log(info);
+      const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
+      const canCallBiteNow = info[2];
+      console.log("xx " + canCallBiteNow);
+      if (canCallBiteNow) {
+        console.log("going to bite");
+        try{
+          await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
+        }catch(e){
+          console.log(e);
+        }
+        
+        console.log("Bitten: " + cdp + " By: " + MEMBER_1);
       }
-      bitten.set(cdp, true);
-    } else {
-      break;
+
+      // bitten.set(cdp, true);
     }
     cdp++;
   }
@@ -141,7 +153,7 @@ async function processBite() {
 
 async function increaseHalfHour() {
   // const hop = await osm.hop();
-  await time.increase((3600 / 2) + 1);
+  await time.increase(3600 / 2 + 1);
 }
 
 async function processTopup(cdp) {
@@ -154,7 +166,6 @@ async function processTopup(cdp) {
     await memberTopup(cdp, { from: MEMBER_1 });
     topped.set(cdp, true);
   } else {
-    
     //console.log("topup not allowed: " + cdp);
   }
 }

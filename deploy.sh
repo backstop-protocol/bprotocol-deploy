@@ -152,6 +152,20 @@ if [ -z "${MIGRATE}" ]; then
     verifyDeploy $MIGRATE && export MIGRATE=$MIGRATE
 fi
 
+# Deploy LiquidatorInfo
+# ctor args = manager_
+if [ -z "${LIQUIDATORINFO}" ]; then
+    LIQUIDATORINFO=$(dapp create LiquidatorInfo $B_CDP_MANAGER)
+    verifyDeploy $LIQUIDATORINFO && export LIQUIDATORINFO=$LIQUIDATORINFO
+fi 
+
+# Deploy FlatLiquidatorInfo
+# ctor args = manager_
+if [ -z "${FLATLIQUIDATORINFO}" ]; then
+    FLATLIQUIDATORINFO=$(dapp create FlatLiquidatorInfo $B_CDP_MANAGER)
+    verifyDeploy $FLATLIQUIDATORINFO && export FLATLIQUIDATORINFO=$FLATLIQUIDATORINFO
+fi
+
 
 ### DEPLOYMENT DONE ####
 
