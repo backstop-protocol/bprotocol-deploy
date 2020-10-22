@@ -124,28 +124,49 @@ async function processCdps() {
 async function processBite() {
   let cdp = 1;
   while (true) {
-    const exists = await isCdpExists(cdp);
-    if (!exists) return;
-    const toppedUp = await topped.get(cdp);
+    try {
+      const exists = await isCdpExists(cdp);
+      if (!exists) return;
 
-    if (toppedUp) {
-      const info = await liqInfo.getBiteInfo(cdp, MEMBER_1);
-      console.log(info);
-      const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
-      const canCallBiteNow = info[2];
-      console.log("xx " + canCallBiteNow);
-      if (canCallBiteNow) {
-        console.log("going to bite");
-        try{
+      const toppedUp = await topped.get(cdp);
+      const isBitten = bitten.get(cdp);
+
+      if (toppedUp && !isBitten) {
+        const info = await liqInfo.getBiteInfo(cdp, MEMBER_1);
+        console.log(info);
+        const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
+        const canCallBiteNow = info[2];
+        console.log("xx " + canCallBiteNow);
+        if (canCallBiteNow) {
+          console.log("going to bite");
+
+          const dMemberInk = await pool.bite.call(cdp, avail, 1, { from: MEMBER_1 });
+          console.log("bite.call(): " + dMemberInk);
+          const currGem = await vat.gem(ILK_ETH, MEMBER_1);
+          console.log("currGem: " + currGem);
+
           await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
-        }catch(e){
-          console.log(e);
-        }
-        
-        console.log("Bitten: " + cdp + " By: " + MEMBER_1);
-      }
 
-      // bitten.set(cdp, true);
+          const afterGem = await vat.gem(ILK_ETH, MEMBER_1);
+          console.log("afterGem: " + afterGem);
+
+          console.log("Bitten: " + cdp + " By: " + MEMBER_1);
+
+          const currWethBal = await await weth.balanceOf(MEMBER_1);
+          console.log("currWethBal: " + currWethBal);
+
+          await gemJoin.exit(MEMBER_1, afterGem, { from: MEMBER_1 });
+
+          const afterWethBal = await await weth.balanceOf(MEMBER_1);
+          console.log("afterWethBal: " + afterWethBal);
+
+          console.log("ethJoin.exit(): " + afterGem);
+        }
+
+        bitten.set(cdp, true);
+      }
+    } catch (err) {
+      console.log(err);
     }
     cdp++;
   }
@@ -184,7 +205,7 @@ async function isTopupAllowed(cdp) {
 
 async function init() {
   await mintDaiForMember(20, 1000, { from: MEMBER_1 });
-  await memberDeposit(HUNDRED_DAI.mul(RAY), { from: MEMBER_1 });
+  await memberDeposit(new BN(1000).mul(ONE_ETH).mul(RAY), { from: MEMBER_1 });
 }
 
 function sleep(ms) {

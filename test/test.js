@@ -86,7 +86,7 @@ contract("Testchain", (accounts) => {
 
     await sleep(10000);
 
-    await increaseHalfHour();
+    // await increaseHalfHour();
     await increaseHalfHour();
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     await osm.poke();
