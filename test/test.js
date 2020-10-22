@@ -21,7 +21,6 @@ const OSM = artifacts.require("OSM");
 const DSValue = artifacts.require("DSValue");
 const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
 const Spotter = artifacts.require("Spotter");
-const MockPriceFeed = artifacts.require("MockPriceFeed");
 
 let bCdpManager;
 let dssCdpManager;
@@ -49,7 +48,7 @@ contract("Testchain", (accounts) => {
     osm = await OSM.at(mcdJSON.PIP_ETH);
     dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
     spot = await Spotter.at(mcdJSON.MCD_SPOT);
-    real = await MockPriceFeed.at(bpJSON.PRICE_FEED);
+    real = await DSValue.at(bpJSON.PRICE_FEED);
 
     // await init();
   });
@@ -76,7 +75,7 @@ contract("Testchain", (accounts) => {
     await time.increase(nextTime);
     await setNextPrice(new BN(145).mul(ONE_ETH));
     await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
-    await real.poke(new BN(145).mul(ONE_ETH));
+    await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     console.log("Current price: " + (await getCurrentPrice()).toString());
     await increaseHalfHour();
   });
@@ -89,7 +88,7 @@ contract("Testchain", (accounts) => {
 
     await increaseHalfHour();
     await increaseHalfHour();
-    await real.poke(new BN(145).mul(ONE_ETH));
+    await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     await osm.poke();
     await spot.poke(ILK_ETH);
     console.log("Current price: " + (await getCurrentPrice()).toString());
