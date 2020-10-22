@@ -161,6 +161,9 @@ async function processBite() {
           console.log("afterWethBal: " + afterWethBal);
 
           console.log("ethJoin.exit(): " + afterGem);
+
+          const rad = await pool.rad(MEMBER_1);
+          await memberWithdraw(rad, { from: MEMBER_1 });
         }
 
         bitten.set(cdp, true);

@@ -65,12 +65,11 @@ contract("Testchain", (accounts) => {
   // });
 
   // 1.
-  it("mint DAI for User", async () => {
+  it("Test Bite", async () => {
+    // 1.
     await mintDaiForUser(2, 199, { from: USER_1 });
-  });
 
-  // 2.
-  it("setNextPrice", async () => {
+    // 2. setNextPrice
     const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
     await time.increase(nextTime);
     await setNextPrice(new BN(145).mul(ONE_ETH));
@@ -78,10 +77,8 @@ contract("Testchain", (accounts) => {
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     console.log("Current price: " + (await getCurrentPrice()).toString());
     await increaseHalfHour();
-  });
 
-  // 3.
-  it("poke", async () => {
+    // 3.  poke
     console.log("waiting.....");
 
     await sleep(10000);
