@@ -2,7 +2,6 @@ const { BN } = require("@openzeppelin/test-helpers");
 const { sleep } = require("../../test-utils/utils");
 const { RAY, RAD, ONE_ETH } = require("../../test-utils/constants");
 
-const abiJSON = require("../../lib/dss-cdp-manager/out/dapp.sol.json");
 const mcdJSON = require("../../config/mcd_testchain.json");
 const bpJSON = require("../../config/bprotocol_testchain.json");
 const { default: Web3 } = require("web3");
@@ -20,26 +19,19 @@ const LiquidatorInfo = artifacts.require("LiquidatorInfo");
 // B.Protocol Contracts
 const BCdpManager = artifacts.require("BCdpManager");
 const Pool = artifacts.require("Pool");
-const BudConnector = artifacts.require("BudConnector");
-const DSValue = artifacts.require("DSValue");
 const OSM = artifacts.require("OSM");
 
 let bCdpManager;
 let pool;
-let dai;
-let daiJoin;
 let dssCdpManager;
 let gemJoin;
 let weth;
 let vat;
-let osm;
+
 let spot;
 let liqInfo;
 
 let MEMBER_1 = bpJSON.MEMBER_1;
-let MEMBER_2 = bpJSON.MEMBER_2;
-let MEMBER_3 = bpJSON.MEMBER_3;
-let MEMBER_4 = bpJSON.MEMBER_4;
 
 const ILK_ETH = web3.utils.padRight(web3.utils.asciiToHex("ETH-A"), 64);
 
@@ -93,7 +85,7 @@ module.exports = async function (callback) {
     });
 
     while (true) {
-      await sleep(100);
+      await sleep(10);
     }
   } catch (err) {
     console.log(err);
@@ -101,31 +93,27 @@ module.exports = async function (callback) {
 };
 
 async function processUntop() {
-  let cdp = 1;
-  while (true) {
+  let maxCdp = await getCdpi();
+  for (let i = 1; i <= maxCdp; i++) {
+    const cdp = i;
+
     try {
-      const exist = await isCdpExists(cdp);
-      if (exist) {
-        // isToppedUp && !isBitten && isSafe
-        const toppedUp = await topped.get(cdp);
-        const isBitten = bitten.get(cdp);
-        console.log("trying UNTOP: " + cdp);
-        console.log("toppedUp: " + cdp + " : " + toppedUp);
-        console.log("isBitten: " + cdp + " : " + isBitten);
-        if (toppedUp && !isBitten) {
-          const info = await liqInfo.getBiteInfo(cdp, MEMBER_1);
-          console.log("UNTOP: " + info);
-          const canCallBiteNow = info[2];
-          if (!canCallBiteNow) {
-            // untop
-            await pool.untop(cdp, { from: MEMBER_1 });
-            console.log("Untopped: " + cdp);
-          }
+      // isToppedUp && !isBitten && isSafe
+      const toppedUp = await topped.get(cdp);
+      const isBitten = bitten.get(cdp);
+      console.log("trying UNTOP: " + cdp);
+      console.log("toppedUp: " + cdp + " : " + toppedUp);
+      console.log("isBitten: " + cdp + " : " + isBitten);
+      if (toppedUp && !isBitten) {
+        const info = await liqInfo.getBiteInfo(cdp, MEMBER_1);
+        console.log("UNTOP: " + info);
+        const canCallBiteNow = info[2];
+        if (!canCallBiteNow) {
+          // untop
+          await pool.untop(cdp, { from: MEMBER_1 });
+          console.log("Untopped: " + cdp);
         }
-      } else {
-        break;
       }
-      cdp++;
     } catch (err) {
       console.log(err);
     }
@@ -133,27 +121,19 @@ async function processUntop() {
 }
 
 async function processCdps() {
-  let cdp = 1;
-  while (true) {
-    const exist = await isCdpExists(cdp);
-    if (exist) {
-      // console.log("Checking cdp: " + cdp);
-      await processTopup(cdp);
-    } else {
-      // console.log("Cdp not exists: " + cdp);
-      break;
-    }
-    cdp++;
+  let maxCdp = await getCdpi();
+  for (let i = 1; i <= maxCdp; i++) {
+    const cdp = i;
+    await processTopup(cdp);
   }
 }
 
 async function processBite() {
-  let cdp = 1;
-  while (true) {
-    try {
-      const exists = await isCdpExists(cdp);
-      if (!exists) return;
+  let maxCdp = await getCdpi();
+  for (let i = 1; i <= maxCdp; i++) {
+    const cdp = i;
 
+    try {
       const toppedUp = await topped.get(cdp);
       const isBitten = bitten.get(cdp);
 
@@ -198,7 +178,6 @@ async function processBite() {
     } catch (err) {
       console.log(err);
     }
-    cdp++;
   }
 }
 
@@ -214,6 +193,10 @@ async function processTopup(cdp) {
   } else {
     //console.log("topup not allowed: " + cdp);
   }
+}
+
+async function getCdpi() {
+  return await bCdpManager.cdpi();
 }
 
 async function isCdpExists(cdp) {
