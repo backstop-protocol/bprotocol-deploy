@@ -12,7 +12,7 @@ const DssCdpManager = artifacts.require("DssCdpManager");
 const Dai = artifacts.require("Dai");
 const DaiJoin = artifacts.require("DaiJoin");
 const GemJoin = artifacts.require("GemJoin");
-const WETH = artifacts.require("WETH");
+const WETH9 = artifacts.require("WETH9");
 const Vat = artifacts.require("Vat");
 const Spotter = artifacts.require("Spotter");
 const LiquidatorInfo = artifacts.require("LiquidatorInfo");
@@ -47,20 +47,20 @@ const topped = new Map();
 const bitten = new Map();
 
 module.exports = async function (callback) {
-  bCdpManager = await BCdpManager.at(bpJSON.B_CDP_MANAGER);
-  pool = await Pool.at(bpJSON.POOL);
-  dai = await Dai.at(mcdJSON.MCD_DAI);
-  daiJoin = await DaiJoin.at(mcdJSON.MCD_JOIN_DAI);
-  dssCdpManager = await DssCdpManager.at(mcdJSON.CDP_MANAGER);
-  gemJoin = await GemJoin.at(mcdJSON.MCD_JOIN_ETH_A);
-  vat = await Vat.at(mcdJSON.MCD_VAT);
-  osm = await OSM.at(mcdJSON.PIP_ETH);
-  spot = await Spotter.at(mcdJSON.MCD_SPOT);
-  const gem = await gemJoin.gem();
-  weth = await WETH.at(gem);
-  liqInfo = await LiquidatorInfo.at(bpJSON.LIQUIDATORINFO);
-
   try {
+    bCdpManager = await BCdpManager.at(bpJSON.B_CDP_MANAGER);
+    pool = await Pool.at(bpJSON.POOL);
+    dai = await Dai.at(mcdJSON.MCD_DAI);
+    daiJoin = await DaiJoin.at(mcdJSON.MCD_JOIN_DAI);
+    dssCdpManager = await DssCdpManager.at(mcdJSON.CDP_MANAGER);
+    gemJoin = await GemJoin.at(mcdJSON.MCD_JOIN_ETH_A);
+    vat = await Vat.at(mcdJSON.MCD_VAT);
+    osm = await OSM.at(mcdJSON.PIP_ETH);
+    spot = await Spotter.at(mcdJSON.MCD_SPOT);
+    const gem = await gemJoin.gem();
+    weth = await WETH9.at(gem);
+    liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
+
     // initialize
     await init();
 
@@ -70,8 +70,12 @@ module.exports = async function (callback) {
         address: spot.address,
       },
       async (error, result) => {
-        await processUntop();
-        await processBite();
+        try {
+          await processUntop();
+          await processBite();
+        } catch (err) {
+          console.log(err);
+        }
       }
     );
 
@@ -87,12 +91,12 @@ module.exports = async function (callback) {
         console.log(err);
       }
     });
+
+    while (true) {
+      await sleep(100);
+    }
   } catch (err) {
     console.log(err);
-  }
-
-  while (true) {
-    await sleep(100);
   }
 };
 
