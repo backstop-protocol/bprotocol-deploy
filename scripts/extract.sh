@@ -6,7 +6,7 @@ dapp --use solc:0.5.16 build --extract
 
 cd ../..
 
-cp ./lib/testchain/out/mcd/*.abi ./abi
+cp ./testchain/out/mcd/*.abi ./abi
 
 for f in ./abi/*.abi ; do 
     value=$(cat $f)

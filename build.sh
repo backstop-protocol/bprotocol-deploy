@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 DIR=$PWD
-DIR_DEPLOY_SCRIPTS=$PWD/lib/testchain/lib/dss-deploy-scripts
-DIR_TESTCHAIN=$PWD/lib/testchain
+DIR_DEPLOY_SCRIPTS=$PWD/testchain/lib/dss-deploy-scripts
+DIR_TESTCHAIN=$PWD/testchain
 
 #### Build Snapshot from scratch #####
 

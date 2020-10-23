@@ -152,13 +152,6 @@ if [ -z "${MIGRATE}" ]; then
     verifyDeploy $MIGRATE && export MIGRATE=$MIGRATE
 fi
 
-# Deploy LiquidatorInfo
-# ctor args = manager_
-if [ -z "${LIQUIDATORINFO}" ]; then
-    LIQUIDATORINFO=$(dapp create LiquidatorInfo $B_CDP_MANAGER)
-    verifyDeploy $LIQUIDATORINFO && export LIQUIDATORINFO=$LIQUIDATORINFO
-fi 
-
 # Deploy FlatLiquidatorInfo
 # ctor args = manager_
 if [ -z "${FLATLIQUIDATORINFO}" ]; then
@@ -206,7 +199,7 @@ fi
 # Set Pool Params
 if [ -z "${POOL_SETUP_DONE}" ]; then
     seth send $POOL 'setCdpManager(address)' $B_CDP_MANAGER
-    seth send $POOL 'setProfitParams(uint256,uint256)' 1065 1130 # Liquidator profit 106/113
+    seth send $POOL 'setProfitParams(uint256,uint256)' 1065 1130 # Liquidator profit 106.5/113
     seth send $POOL 'setIlk(bytes32,bool)' $ILK_ETH 1
     seth send $POOL 'setIlk(bytes32,bool)' $ILK_WBTC 1
     seth send $POOL 'setOsm(bytes32,address)' $ILK_ETH $BUD_CONN_ETH
