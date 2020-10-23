@@ -1,10 +1,6 @@
 const BN = require("bn.js");
 const { time } = require("@openzeppelin/test-helpers");
 
-require("@openzeppelin/test-helpers/configure")({
-  provider: "http://localhost:2000",
-});
-
 const abiJSON = require("../lib/dss-cdp-manager/out/dapp.sol.json");
 const mcdJSON = require("../config/mcd_testchain.json");
 const bpJSON = require("../config/bprotocol_testchain.json");
@@ -66,54 +62,12 @@ contract("Testchain", (accounts) => {
   // });
 
   // 1.
-    it("Test Bite", async () => {
-      // 1. Mint
-      await mintDaiForUser(2, 199, { from: USER_1 });
-
-      // 2. setNextPrice
-      const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
-      await time.increase(nextTime);
-      await setNextPrice(new BN(145).mul(ONE_ETH));
-      await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
-      await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
-      console.log("Current price: " + (await getCurrentPrice()).toString());
-      await increaseHalfHour();
-
-      // 3. It should be topped up at Bot
-
-      // 4. poke
-      console.log("waiting.....");
-      await sleep(10000);
-
-      // await increaseHalfHour();
-      await increaseHalfHour();
-      await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
-      await osm.poke();
-      await spot.poke(ILK_ETH);
-      console.log("Current price: " + (await getCurrentPrice()).toString());
-
-      // 5. It should be bitten at Bot
-    });
-
-  it("Test untop", async () => {
-    // 0. Set the price back to original
-    let nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
-      await time.increase(nextTime);
-      await setNextPrice(new BN(150).mul(ONE_ETH));
-      await dai2usd.setPrice(new BN(150).mul(ONE_ETH));
-      await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
-      console.log("Current price: " + (await getCurrentPrice()).toString());
-      await increaseHalfHour();
-    await increaseHalfHour();
-      await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
-      await osm.poke();
-      await spot.poke(ILK_ETH);
-
-    // 1.
-    const cdp = await mintDaiForUser(2, 199, { from: USER_2 });
+  it("Test Bite", async () => {
+    // 1. Mint
+    await mintDaiForUser(2, 199, { from: USER_1 });
 
     // 2. setNextPrice
-    nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
+    const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
     await time.increase(nextTime);
     await setNextPrice(new BN(145).mul(ONE_ETH));
     await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
@@ -123,27 +77,69 @@ contract("Testchain", (accounts) => {
 
     // 3. It should be topped up at Bot
 
+    // 4. poke
     console.log("waiting.....");
     await sleep(10000);
 
-    // 4. Set 200 next price again
-    await bCdpManager.frob(cdp, -1, 0, {from: USER_2});
-    nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
-    await time.increase(nextTime);
-    await setNextPrice(new BN(200).mul(ONE_ETH));
-    await dai2usd.setPrice(new BN(200).mul(ONE_ETH));
-    await real.poke(uintToBytes32(new BN(200).mul(ONE_ETH)));
-    console.log("Current price: " + (await getCurrentPrice()).toString());
-    await increaseHalfHour();
-
-    // 5. poke
+    // await increaseHalfHour();
     await increaseHalfHour();
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     await osm.poke();
     await spot.poke(ILK_ETH);
+    console.log("Current price: " + (await getCurrentPrice()).toString());
 
-    // 5. It should be untopped at Bot
+    // 5. It should be bitten at Bot
   });
+
+  //   it("Test untop", async () => {
+  //     // 0. Set the price back to original
+  //     let nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
+  //     await time.increase(nextTime);
+  //     await setNextPrice(new BN(150).mul(ONE_ETH));
+  //     await dai2usd.setPrice(new BN(150).mul(ONE_ETH));
+  //     await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
+  //     console.log("Current price: " + (await getCurrentPrice()).toString());
+  //     await increaseHalfHour();
+  //     await increaseHalfHour();
+  //     await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
+  //     await osm.poke();
+  //     await spot.poke(ILK_ETH);
+
+  //     // 1.
+  //     const cdp = await mintDaiForUser(2, 199, { from: USER_2 });
+
+  //     // 2. setNextPrice
+  //     nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
+  //     await time.increase(nextTime);
+  //     await setNextPrice(new BN(145).mul(ONE_ETH));
+  //     await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
+  //     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+  //     console.log("Current price: " + (await getCurrentPrice()).toString());
+  //     await increaseHalfHour();
+
+  //     // 3. It should be topped up at Bot
+
+  //     console.log("waiting.....");
+  //     await sleep(10000);
+
+  //     // 4. Set 200 next price again
+  //     await bCdpManager.frob(cdp, -1, 0, { from: USER_2 });
+  //     nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
+  //     await time.increase(nextTime);
+  //     await setNextPrice(new BN(200).mul(ONE_ETH));
+  //     await dai2usd.setPrice(new BN(200).mul(ONE_ETH));
+  //     await real.poke(uintToBytes32(new BN(200).mul(ONE_ETH)));
+  //     console.log("Current price: " + (await getCurrentPrice()).toString());
+  //     await increaseHalfHour();
+
+  //     // 5. poke
+  //     await increaseHalfHour();
+  //     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+  //     await osm.poke();
+  //     await spot.poke(ILK_ETH);
+
+  //     // 5. It should be untopped at Bot
+  //   });
 });
 
 function sleep(ms) {

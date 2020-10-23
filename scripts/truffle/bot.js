@@ -1,22 +1,11 @@
-const { time } = require("@openzeppelin/test-helpers");
-
-require("@openzeppelin/test-helpers/configure")({
-  provider: "http://localhost:2000",
-});
-
-const BN = require("bn.js");
+const { BN } = require("@openzeppelin/test-helpers");
+const { sleep } = require("../../test-utils/utils");
+const { RAY, RAD, ONE_ETH } = require("../../test-utils/constants");
 
 const abiJSON = require("../../lib/dss-cdp-manager/out/dapp.sol.json");
 const mcdJSON = require("../../config/mcd_testchain.json");
 const bpJSON = require("../../config/bprotocol_testchain.json");
 const { default: Web3 } = require("web3");
-const { min } = require("bn.js");
-
-// Constants
-const RAY = new BN(10).pow(new BN(27));
-const ONE_ETH = new BN(10).pow(new BN(18));
-const HUNDRED_DAI = new BN(100).mul(ONE_ETH);
-const FIFTY_DAI = new BN(50).mul(ONE_ETH);
 
 // MCD Contracts
 const DssCdpManager = artifacts.require("DssCdpManager");
@@ -209,11 +198,6 @@ async function processBite() {
   }
 }
 
-async function increaseHalfHour() {
-  // const hop = await osm.hop();
-  await time.increase(3600 / 2 + 1);
-}
-
 async function processTopup(cdp) {
   const allowed = await isTopupAllowed(cdp);
   if (allowed) {
@@ -245,10 +229,6 @@ async function init() {
   await memberDeposit(new BN(1000).mul(ONE_ETH).mul(RAY), { from: MEMBER_1 });
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function memberDeposit(radVal, opt) {
   const _from = opt.from;
   await vat.hope(pool.address, { from: _from });
@@ -257,7 +237,7 @@ async function memberDeposit(radVal, opt) {
 }
 
 function radToDAI(radVal) {
-  return radVal.div(RAY).div(ONE_ETH).toString();
+  return radVal.div(RAD).toString();
 }
 
 function wadToDAI(wad) {
