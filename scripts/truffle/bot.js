@@ -119,7 +119,7 @@ async function processCdps() {
     if (!isPending) {
       await processCdp(cdp);
     } else {
-      console.log("TX PENDING FOR: " + cdp);
+      // console.log("TX PENDING FOR: " + cdp);
     }
   }
 }
@@ -183,16 +183,16 @@ async function processBite(cdp) {
 
 async function processTopup(cdp) {
   const allowed = await isTopupAllowed(cdp);
-    if (topped.get(cdp)) {
-      return;
-    }
-    const info = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
-    const canCallTopupNow = info[7];
-    if(canCallTopupNow) {
-      await memberTopup(cdp, { from: MEMBER_1 });
-      topped.set(cdp, true);
-    }
-  
+  if (topped.get(cdp)) {
+    return;
+  }
+  const info = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
+  const canCallTopupNow = info[7];
+  // console.log(info);
+  if (canCallTopupNow) {
+    await memberTopup(cdp, { from: MEMBER_1 });
+    topped.set(cdp, true);
+  }
 }
 
 async function getCdpi() {
