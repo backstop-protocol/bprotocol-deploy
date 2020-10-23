@@ -12,7 +12,6 @@ logMCD() {
     echo # empty line
     echo "###### MCD ADDRESSES ######"
     echo DAI = $DAI
-    echo WETH = $WETH
     echo VAT = $VAT
     echo END = $END
     echo SPOT = $SPOT

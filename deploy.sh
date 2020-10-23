@@ -32,8 +32,8 @@ fi
 #########################
 ##### BUILD PROJECT #####
 #########################
-#dapp update
-#dapp --use solc:0.5.16 build
+dapp update
+dapp --use solc:0.5.16 build
 
 
 ###############################
@@ -53,14 +53,21 @@ fi
 if [ -z "${PRICE_FEED}" ]; then
     PRICE_FEED=$(dapp create MockPriceFeed)
     verifyDeploy $PRICE_FEED && export PRICE_FEED=$PRICE_FEED
+    price=$(echo "150 * $ONE_ETH" | bc | seth --to-uint256 | seth --to-bytes32)
+    tx=$(seth send $PRICE_FEED 'poke(bytes32)' $price)
+fi
+
+if [ -z "${CHAINLINK}" ]; then
+    CHAINLINK=$(dapp create MockChainLink)
+    verifyDeploy $CHAINLINK && export CHAINLINK=$CHAINLINK
 fi
 
 ################################
 ##### DEPLOY PROXY_ACTIONS #####
 ################################
-# cd lib/dss-proxy-actions
+# cd dss-proxy-actions
 # dapp update
-cd lib/dss-proxy-actions #&& dapp --use solc:0.5.16 build
+cd dss-proxy-actions && dapp --use solc:0.5.16 build
 
 if [ -z "${B_PROXY_ACTIONS}" ]; then
     B_PROXY_ACTIONS=$(dapp create BProxyActions)
@@ -71,7 +78,7 @@ fi
 ##### DEPLOY CONTRACTS #####
 ############################
 # cd lib/dss-cdp-manager
-cd ../dss-cdp-manager && dapp --use solc:0.5.16 build
+cd ../lib/dss-cdp-manager && dapp --use solc:0.5.16 build
 
 setupTestchain $NETWORK
 
@@ -133,7 +140,8 @@ fi
 
 # Deploy UserInfo
 if [ -z "${USER_INFO}" ]; then
-    USER_INFO=$(dapp create UserInfo $DAI $WETH)
+    gem=$(seth call $GEM_JOIN_ETH 'gem()(address)')
+    USER_INFO=$(dapp create UserInfo $DAI $gem)
     verifyDeploy $USER_INFO && export USER_INFO=$USER_INFO
 fi
 
@@ -154,9 +162,9 @@ fi
 
 # Deploy FlatLiquidatorInfo
 # ctor args = manager_
-if [ -z "${FLATLIQUIDATORINFO}" ]; then
-    FLATLIQUIDATORINFO=$(dapp create FlatLiquidatorInfo $B_CDP_MANAGER)
-    verifyDeploy $FLATLIQUIDATORINFO && export FLATLIQUIDATORINFO=$FLATLIQUIDATORINFO
+if [ -z "${FLATLIQUIDATOR_INFO}" ]; then
+    FLATLIQUIDATOR_INFO=$(dapp create FlatLiquidatorInfo $B_CDP_MANAGER $CHAINLINK)
+    verifyDeploy $FLATLIQUIDATOR_INFO && export FLATLIQUIDATOR_INFO=$FLATLIQUIDATOR_INFO
 fi
 
 
@@ -227,6 +235,7 @@ echo SCORE=$SCORE
 echo JAR=$JAR
 echo JAR_CONNECTOR=$JAR_CONNECTOR
 echo PRICE_FEED=$PRICE_FEED
+echo CHAINLINK=$CHAINLINK
 echo B_CDP_MANAGER=$B_CDP_MANAGER
 echo POOL=$POOL
 echo BUD_CONN_ETH=$BUD_CONN_ETH 
@@ -241,6 +250,7 @@ echo MEMBERS=$MEMBERS
 echo GOV_EXECUTOR=$GOV_EXECUTOR
 echo MIGRATE=$MIGRATE
 echo B_PROXY_ACTIONS=$B_PROXY_ACTIONS
+echo FLATLIQUIDATOR_INFO=$FLATLIQUIDATOR_INFO
 echo "##################################"
 
 # VALIDATE DEPLOYMENT
