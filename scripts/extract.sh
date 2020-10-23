@@ -1,12 +1,25 @@
 #!/bin/sh
 export SOLC_FLAGS="--optimize optimize-runs=200"
+
+
+# build bprotocol-deploy
+export DAPP_OUT=./abi
+dapp update && dapp --use solc:0.5.16 build --extract
+
+# build dss-proxy-actions
+export DAPP_OUT=../abi
+cd dss-proxy-actions
+dapp update && dapp --use solc:0.5.16 build --extract
+cd ..
+
+# build dss-cdp-manager
 export DAPP_OUT=../../abi
 cd lib/dss-cdp-manager
-dapp --use solc:0.5.16 build --extract
+dapp update && dapp --use solc:0.5.16 build --extract
 
 cd ../..
 
-cp ./lib/testchain/out/mcd/*.abi ./abi
+cp ./testchain/out/mcd/*.abi ./abi
 
 for f in ./abi/*.abi ; do 
     value=$(cat $f)

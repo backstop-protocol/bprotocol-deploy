@@ -4,9 +4,9 @@
 [submodule "lib/dss-cdp-manager"]
 	path = lib/dss-cdp-manager
 	url = https://github.com/backstop-protocol/dss-cdp-manager
-[submodule "lib/testchain"]
-	path = lib/testchain
-	url = https://github.com/makerdao/testchain
-[submodule "lib/dss-proxy-actions"]
-	path = lib/dss-proxy-actions
-	url = https://github.com/backstop-protocol/dss-proxy-actions
+[submodule "testchain"]
+	path = testchain
+	url = https://github.com/makerdao/testchain.git
+[submodule "dss-proxy-actions"]
+	path = dss-proxy-actions
+	url = https://github.com/backstop-protocol/dss-proxy-actions.git
