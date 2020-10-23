@@ -7,3 +7,6 @@
 [submodule "testchain"]
 	path = testchain
 	url = https://github.com/makerdao/testchain.git
+[submodule "dss-proxy-actions"]
+	path = dss-proxy-actions
+	url = https://github.com/backstop-protocol/dss-proxy-actions.git
