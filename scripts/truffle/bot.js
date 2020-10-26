@@ -1,10 +1,8 @@
 const { BN } = require("@openzeppelin/test-helpers");
-const { sleep } = require("../../test-utils/utils");
 const { RAY, RAD, ONE_ETH } = require("../../test-utils/constants");
 
 const mcdJSON = require("../../config/mcd_testchain.json");
 const bpJSON = require("../../config/bprotocol_testchain.json");
-const { default: Web3 } = require("web3");
 
 // MCD Contracts
 const DssCdpManager = artifacts.require("DssCdpManager");
@@ -14,12 +12,12 @@ const GemJoin = artifacts.require("GemJoin");
 const WETH9 = artifacts.require("WETH9");
 const Vat = artifacts.require("Vat");
 const Spotter = artifacts.require("Spotter");
-const LiquidatorInfo = artifacts.require("LiquidatorInfo");
+const OSM = artifacts.require("OSM");
 
 // B.Protocol Contracts
 const BCdpManager = artifacts.require("BCdpManager");
 const Pool = artifacts.require("Pool");
-const OSM = artifacts.require("OSM");
+const LiquidatorInfo = artifacts.require("LiquidatorInfo");
 
 let bCdpManager;
 let pool;
@@ -56,21 +54,6 @@ module.exports = async function (callback) {
   // initialize
   await init();
 
-  // const subscription = web3.eth.subscribe(
-  //   "logs",
-  //   {
-  //     address: spot.address,
-  //   },
-  //   async (error, result) => {
-  //     try {
-  //       await processUntop();
-  //       await processBite();
-  //     } catch (err) {
-  //       console.log(err);
-  //     }
-  //   }
-  // );
-
   web3.eth.subscribe("newBlockHeaders", async (error, event) => {
     try {
       if (!error) {
@@ -83,27 +66,16 @@ module.exports = async function (callback) {
       console.log(err);
     }
   });
-
-  while (true) {
-    await sleep(10);
-  }
 };
 
 async function processUntop(cdp) {
   try {
-    // isToppedUp && !isBitten && isSafe
     const toppedUp = await topped.get(cdp);
     const info = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
-    const shouldCallUntop = info[8];
     // console.log(info);
-    if (toppedUp && shouldCallUntop) {
-      // const info = await liqInfo.getBiteInfo(cdp, MEMBER_1);
-      // const canCallBiteNow = info[3];
-      // if (!canCallBiteNow) {
-      // console.log("UNTOP: " + info);
-      // untop
-      await memberUntop(cdp, { from: MEMBER_1 });
-      // }
+    if (toppedUp && info.shouldCallUntop) {
+      await pool.untop(cdp, { from: MEMBER_1 });
+      console.log("### UN-TOPPED ###: " + cdp);
     }
   } catch (err) {
     console.log(err);
@@ -154,7 +126,8 @@ async function processBite(cdp) {
         const currGem = await vat.gem(ILK_ETH, MEMBER_1);
         // console.log("currGem: " + currGem);
 
-        await memberBite(cdp, avail, 1, { from: MEMBER_1 });
+        await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
+        console.log("### BITTEN ###: " + cdp);
 
         const afterGem = await vat.gem(ILK_ETH, MEMBER_1);
         // console.log("afterGem: " + afterGem);
@@ -170,7 +143,8 @@ async function processBite(cdp) {
         // console.log("ethJoin.exit(): " + afterGem);
 
         const rad = await pool.rad(MEMBER_1);
-        await memberWithdraw(rad, { from: MEMBER_1 });
+        await pool.withdraw(rad, { from: MEMBER_1 });
+        console.log("### WITHDRAWN ###: " + radToDAI(radVal) + " DAI");
 
         // console.log("setting bitten: " + cdp);
         bitten.set(cdp, true);
@@ -187,9 +161,8 @@ async function processTopup(cdp) {
     return;
   }
   const info = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
-  const canCallTopupNow = info[7];
   // console.log(info);
-  if (canCallTopupNow) {
+  if (info.canCallTopupNow) {
     await memberTopup(cdp, { from: MEMBER_1 });
     topped.set(cdp, true);
   }
@@ -197,11 +170,6 @@ async function processTopup(cdp) {
 
 async function getCdpi() {
   return await bCdpManager.cdpi();
-}
-
-async function isCdpExists(cdp) {
-  const urn = await bCdpManager.urns(cdp);
-  return urn != 0;
 }
 
 async function isTopupAllowed(cdp) {
@@ -241,24 +209,6 @@ async function memberTopup(cdp, opt) {
   } catch (err) {
     console.log(err);
   }
-}
-
-async function memberUntop(cdp, opt) {
-  const _from = opt.from;
-  await pool.untop(cdp, { from: _from });
-  console.log("### UN-TOPPED ###: " + cdp);
-}
-
-async function memberBite(cdp, dart, minInk, opt) {
-  const _from = opt.from;
-  await pool.bite(cdp, dart, minInk, { from: _from });
-  console.log("### BITTEN ###: " + cdp);
-}
-
-async function memberWithdraw(radVal, opt) {
-  const _from = opt.from;
-  await pool.withdraw(radVal, { from: _from });
-  console.log("### WITHDRAWN ###: " + radToDAI(radVal) + " DAI");
 }
 
 async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
