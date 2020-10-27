@@ -33,36 +33,39 @@ let MEMBER_1 = bpJSON.MEMBER_1;
 
 const ILK_ETH = web3.utils.padRight(web3.utils.asciiToHex("ETH-A"), 64);
 
-const topped = new Map();
 const pending = new Map();
 
 module.exports = async function (callback) {
-  bCdpManager = await BCdpManager.at(bpJSON.B_CDP_MANAGER);
-  pool = await Pool.at(bpJSON.POOL);
-  dai = await Dai.at(mcdJSON.MCD_DAI);
-  daiJoin = await DaiJoin.at(mcdJSON.MCD_JOIN_DAI);
-  dssCdpManager = await DssCdpManager.at(mcdJSON.CDP_MANAGER);
-  gemJoin = await GemJoin.at(mcdJSON.MCD_JOIN_ETH_A);
-  vat = await Vat.at(mcdJSON.MCD_VAT);
-  osm = await OSM.at(mcdJSON.PIP_ETH);
-  weth = await WETH9.at(await gemJoin.gem());
-  liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
+  try {
+    bCdpManager = await BCdpManager.at(bpJSON.B_CDP_MANAGER);
+    pool = await Pool.at(bpJSON.POOL);
+    dai = await Dai.at(mcdJSON.MCD_DAI);
+    daiJoin = await DaiJoin.at(mcdJSON.MCD_JOIN_DAI);
+    dssCdpManager = await DssCdpManager.at(mcdJSON.CDP_MANAGER);
+    gemJoin = await GemJoin.at(mcdJSON.MCD_JOIN_ETH_A);
+    vat = await Vat.at(mcdJSON.MCD_VAT);
+    osm = await OSM.at(mcdJSON.PIP_ETH);
+    weth = await WETH9.at(await gemJoin.gem());
+    liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
 
-  // initialize
-  await init();
+    // initialize
+    await init();
 
-  web3.eth.subscribe("newBlockHeaders", async (error, event) => {
-    try {
-      if (!error) {
-        console.log("Block: " + event.number);
-        await processCdps();
-      } else {
-        console.log(error);
+    web3.eth.subscribe("newBlockHeaders", async (error, event) => {
+      try {
+        if (!error) {
+          console.log("Block: " + event.number);
+          await processCdps();
+        } else {
+          console.log(error);
+        }
+      } catch (err) {
+        console.log(err);
       }
-    } catch (err) {
-      console.log(err);
-    }
-  });
+    });
+  } catch (err) {
+    console.log(err);
+  }
 };
 
 async function processCdps() {
@@ -79,10 +82,15 @@ async function processCdp(cdp) {
   pending.set(cdp, true);
 
   let cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
-  if (cushionInfo.canCallTopupNow && !topped.get(cdp)) {
+
+  const cushion = await bCdpManager.cushion(cdp);
+  // console.log(cushion.toString());
+  if (!cushionInfo.isToppedUp && cushionInfo.canCallTopupNow) {
+    // console.log(cushionInfo);
     await processTopup(cdp);
-    topped.set(cdp, true);
-  } else if (cushionInfo.shouldCallUntop && topped.get(cdp)) {
+    // const cushion = await bCdpManager.cushion(cdp);
+    // console.log("x" + cushion.toString());
+  } else if (cushionInfo.isToppedUp && cushionInfo.shouldCallUntop) {
     await processUntop(cdp);
   }
 
@@ -127,7 +135,7 @@ async function processBite(cdp) {
 
   const rad = await pool.rad(MEMBER_1);
   await pool.withdraw(rad, { from: MEMBER_1 });
-  console.log("### WITHDRAWN ###: " + radToDAI(radVal) + " DAI");
+  console.log("### WITHDRAWN ###: " + radToDAI(rad) + " DAI");
 }
 
 async function init() {
