@@ -83,13 +83,8 @@ async function processCdp(cdp) {
 
   let cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
 
-  const cushion = await bCdpManager.cushion(cdp);
-  // console.log(cushion.toString());
   if (!cushionInfo.isToppedUp && cushionInfo.canCallTopupNow) {
-    // console.log(cushionInfo);
     await processTopup(cdp);
-    // const cushion = await bCdpManager.cushion(cdp);
-    // console.log("x" + cushion.toString());
   } else if (cushionInfo.isToppedUp && cushionInfo.shouldCallUntop) {
     await processUntop(cdp);
   }
@@ -114,25 +109,15 @@ async function processUntop(cdp) {
 async function processBite(cdp) {
   const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
 
-  // const dMemberInk = await pool.bite.call(cdp, avail, 1, { from: MEMBER_1 });
-  // console.log("bite.call(): " + dMemberInk);
-  // const currGem = await vat.gem(ILK_ETH, MEMBER_1);
-  // console.log("currGem: " + currGem);
-
+  // bite
   await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
   console.log("### BITTEN ###: " + cdp);
 
+  // exit
   const afterGem = await vat.gem(ILK_ETH, MEMBER_1);
-  // console.log("afterGem: " + afterGem);
-  // const currWethBal = await await weth.balanceOf(MEMBER_1);
-  // console.log("currWethBal: " + currWethBal);
-
   await gemJoin.exit(MEMBER_1, afterGem, { from: MEMBER_1 });
 
-  // const afterWethBal = await await weth.balanceOf(MEMBER_1);
-  // console.log("afterWethBal: " + afterWethBal);
-  // console.log("ethJoin.exit(): " + afterGem);
-
+  // withdraw
   const rad = await pool.rad(MEMBER_1);
   await pool.withdraw(rad, { from: MEMBER_1 });
   console.log("### WITHDRAWN ###: " + radToDAI(rad) + " DAI");
