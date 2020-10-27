@@ -84,19 +84,22 @@ async function processCdp(cdp) {
   let cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
 
   if (!cushionInfo.isToppedUp && cushionInfo.canCallTopupNow) {
-    await processTopup(cdp);
+    await processTopup(cdp, cushionInfo.cushionSizeInWei);
   } else if (cushionInfo.isToppedUp && cushionInfo.shouldCallUntop) {
     await processUntop(cdp);
   }
 
   // Read latest biteInfo just before bite call
   const biteInfo = await liqInfo.getBiteInfo(cdp, MEMBER_1);
-  if (biteInfo.canCallBiteNow) await processBite(cdp);
+  if (biteInfo.canCallBiteNow) {
+    await processBite(cdp, biteInfo.availableBiteInDaiWei);
+  }
 
   pending.set(cdp, false);
 }
 
-async function processTopup(cdp) {
+async function processTopup(cdp, cushionSizeInWei) {
+  await ensureDAIBalance(cdp, new BN(cushionSizeInWei).mul(RAY), { from: MEMBER_1 });
   await pool.topup(cdp, { from: MEMBER_1 });
   console.log("### TOPPED-UP ###: " + cdp);
 }
@@ -106,9 +109,10 @@ async function processUntop(cdp) {
   console.log("### UN-TOPPED ###: " + cdp);
 }
 
-async function processBite(cdp) {
+async function processBite(cdp, availableBiteInDaiWei) {
   const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
 
+  await ensureDAIBalance(cdp, new BN(availableBiteInDaiWei).mul(RAY), { from: MEMBER_1 });
   // bite
   await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
   console.log("### BITTEN ###: " + cdp);
@@ -123,13 +127,41 @@ async function processBite(cdp) {
   console.log("### WITHDRAWN ###: " + radToDAI(rad) + " DAI");
 }
 
+// Ensure that the MEMBER has expected DAI balance before topup
+async function ensureDAIBalance(cdp, neededRadBal, opt) {
+  try {
+    const _from = opt.from;
+    const radInVat = await vat.dai(_from);
+    const radInPool = await pool.rad(_from);
+    console.log("radInPool: " + radInPool);
+    console.log("neededRadBal: " + neededRadBal);
+    const radMemberHave = radInPool.add(radInVat);
+    if (radMemberHave.lt(neededRadBal)) {
+      // mint more DAI
+      const radNeedsMore = neededRadBal.sub(radMemberHave);
+      await manager.frob(cdp, 0, radNeedsMore, { from: _from });
+      console.log("MINTED " + radToDAI(radNeedsMore) + " DAI");
+    }
+
+    if (radInPool.lt(neededRadBal)) {
+      // radNeedsMore = neededRadBal - radInPool + 1e18
+      const radNeedsMore = neededRadBal.sub(radInPool).add(ONE_ETH);
+      await pool.deposit(radNeedsMore, { from: _from });
+      console.log("Member:" + _from + " deposited: " + radToDAI(radNeedsMore) + " DAI");
+    }
+  } catch (err) {
+    console.log(err);
+  }
+}
+
 async function init() {
   await mintDaiForMember(20, 1000, { from: MEMBER_1 });
 
   await vat.hope(pool.address, { from: MEMBER_1 });
-  const radVal = new BN(1000).mul(ONE_ETH).mul(RAY);
-  await pool.deposit(radVal, { from: MEMBER_1 });
-  console.log("Member:" + MEMBER_1 + " deposited: " + radToDAI(radVal) + " DAI");
+  // deposit 1 DAI
+  const depositRad = ONE_ETH.mul(RAY);
+  await pool.deposit(depositRad, { from: MEMBER_1 });
+  console.log("Member:" + MEMBER_1 + " deposited: " + radToDAI(depositRad) + " DAI");
 }
 
 function radToDAI(radVal) {
