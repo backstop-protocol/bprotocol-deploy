@@ -47,40 +47,7 @@ contract("Testchain", (accounts) => {
     // await init();
   });
 
-  // 1.
-  // it("Test Bite", async () => {
-  //   // 1. Mint
-  //   await mintDaiForUser(2, 199, { from: USER_1 });
-
-  //   // 2. setNextPrice
-  //   const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
-  //   await time.increase(nextTime);
-  //   await setNextPrice(new BN(145).mul(ONE_ETH));
-  //   await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
-  //   await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
-  //   console.log("Current price: " + (await getCurrentPrice()).toString());
-  //   await increaseHalfHour();
-
-  //   // 3. It should be topped up at Bot
-
-  //   // 4. poke
-  //   console.log("waiting.....");
-  //   await sleep(10000);
-
-  //   // await increaseHalfHour();
-  //   await increaseHalfHour();
-  //   await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
-  //   await osm.poke();
-  //   await spot.poke(ILK_ETH);
-  //   console.log("Current price: " + (await getCurrentPrice()).toString());
-
-  //   // 5. It should be bitten at Bot
-  // });
-
   it("Test untop", async () => {
-    console.log("waiting.....");
-    await sleep(10000);
-
     // 1.
     const cdp = await mintDaiForUser(2, 190, { from: USER_2 });
 
