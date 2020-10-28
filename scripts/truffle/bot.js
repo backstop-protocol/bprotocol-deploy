@@ -72,17 +72,18 @@ async function processCdps() {
   let maxCdp = await bCdpManager.cdpi();
   for (let cdp = 1; cdp <= maxCdp; cdp++) {
     if (!pending.get(cdp)) {
-      await processCdp(cdp);
+      pending.set(cdp, true);
+      try {
+        await processCdp(cdp);
+      } catch (err) {
+        console.log(err);
+      }
+      pending.set(cdp, false);
     }
   }
 }
 
 async function processCdp(cdp) {
-  pending.set(cdp, true);
-
-  // Mine an empty block on Ganache testchain to avoid fast block sync/mine issues
-  await mineBlock();
-
   let cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
 
   if (!cushionInfo.isToppedUp && cushionInfo.canCallTopupNow) {
@@ -96,8 +97,6 @@ async function processCdp(cdp) {
   if (biteInfo.canCallBiteNow) {
     await processBite(cdp, biteInfo.availableBiteInDaiWei);
   }
-
-  pending.set(cdp, false);
 }
 
 async function processTopup(cdp, cushionSizeInWei) {
