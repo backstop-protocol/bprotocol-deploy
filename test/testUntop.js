@@ -65,21 +65,9 @@ contract("Testchain", (accounts) => {
     console.log("waiting.....");
     await sleep(10000);
 
-    // 4. Set 150 next price again
-    await bCdpManager.frob(cdp, -1, 0, { from: USER_2 });
-    nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
-    await time.increase(nextTime);
-    await setNextPrice(new BN(150).mul(ONE_ETH));
-    await dai2usd.setPrice(new BN(150).mul(ONE_ETH));
-    await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
-    console.log("Current price: " + (await getCurrentPrice()).toString());
-    await increaseHalfHour();
-
-    // 5. poke
-    await increaseHalfHour();
-    await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
-    await osm.poke();
-    await spot.poke(ILK_ETH);
+    // 4. Repay 90 DAI
+    const repayDAI = new BN(90).mul(ONE_ETH).mul(new BN(-1));
+    await bCdpManager.frob(cdp, 0, repayDAI, { from: USER_2 });
 
     // 5. It should be untopped at Bot
   });
@@ -89,23 +77,30 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/*
 async function init() {
   const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
   await time.increase(nextTime);
+  await setNextPrice(new BN(300).mul(ONE_ETH));
+  await dai2usd.setPrice(new BN(300).mul(ONE_ETH));
+  await real.poke(uintToBytes32(new BN(300).mul(ONE_ETH)));
 
-  await osm.kiss(mcdJSON.DEPLOYER);
-  const val = await DSValue.at(mcdJSON.VAL_ETH);
-  const bytes32 = uintToBytes32(new BN(150).mul(ONE_ETH));
-  await val.poke(bytes32);
-  await osm.poke();
+  await increaseHalfHour();
+  await increaseHalfHour();
 
-  await time.increase(3600);
-  await osm.poke();
-
+  await setNextPrice(new BN(300).mul(ONE_ETH));
+  await increaseHalfHour();
   console.log("Current price: " + (await getCurrentPrice()).toString());
+  console.log("Next price: " + (await getNextPrice()).toString());
+  // const val = await DSValue.at(mcdJSON.VAL_ETH);
+  // const bytes32 = uintToBytes32(new BN(150).mul(ONE_ETH));
+  // await val.poke(bytes32);
+  // await osm.poke();
+
+  // await time.increase(3600);
+  // await osm.poke();
+
+  console.log("init done");
 }
-*/
 
 async function increaseHalfHour() {
   const hop = await osm.hop();

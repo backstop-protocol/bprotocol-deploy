@@ -32,7 +32,7 @@ fi
 #########################
 ##### BUILD PROJECT #####
 #########################
-dapp update
+# dapp update
 dapp --use solc:0.5.16 build
 
 
