@@ -55,7 +55,7 @@ module.exports = async function (callback) {
       try {
         if (!error) {
           console.log("Block: " + event.number);
-          await processCdps(event);
+          await processCdps();
         } else {
           console.log(error);
         }
@@ -68,16 +68,16 @@ module.exports = async function (callback) {
   }
 };
 
-async function processCdps(event) {
+async function processCdps() {
   let maxCdp = await bCdpManager.cdpi();
   for (let cdp = 1; cdp <= maxCdp; cdp++) {
     if (!pending.get(cdp)) {
-      await processCdp(cdp, event);
+      await processCdp(cdp);
     }
   }
 }
 
-async function processCdp(cdp, event) {
+async function processCdp(cdp) {
   pending.set(cdp, true);
 
   // Mine an empty block on Ganache testchain to avoid fast block sync/mine issues
