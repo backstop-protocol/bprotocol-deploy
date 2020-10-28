@@ -55,7 +55,7 @@ module.exports = async function (callback) {
       try {
         if (!error) {
           console.log("Block: " + event.number);
-          await processCdps();
+          await processCdps(event);
         } else {
           console.log(error);
         }
@@ -68,18 +68,20 @@ module.exports = async function (callback) {
   }
 };
 
-async function processCdps() {
+async function processCdps(event) {
   let maxCdp = await bCdpManager.cdpi();
-  for (let i = 1; i <= maxCdp; i++) {
-    const isPending = pending.get(i);
-    if (!isPending) {
-      await processCdp(i);
+  for (let cdp = 1; cdp <= maxCdp; cdp++) {
+    if (!pending.get(cdp)) {
+      await processCdp(cdp, event);
     }
   }
 }
 
-async function processCdp(cdp) {
+async function processCdp(cdp, event) {
   pending.set(cdp, true);
+
+  // Mine an empty block on Ganache testchain to avoid fast block sync/mine issues
+  await mineBlock();
 
   let cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
 
@@ -133,14 +135,12 @@ async function ensureDAIBalance(cdp, neededRadBal, opt) {
     const _from = opt.from;
     const radInVat = await vat.dai(_from);
     const radInPool = await pool.rad(_from);
-    console.log("radInPool: " + radInPool);
-    console.log("neededRadBal: " + neededRadBal);
     const radMemberHave = radInPool.add(radInVat);
     if (radMemberHave.lt(neededRadBal)) {
       // mint more DAI
       const radNeedsMore = neededRadBal.sub(radMemberHave);
       await manager.frob(cdp, 0, radNeedsMore, { from: _from });
-      console.log("MINTED " + radToDAI(radNeedsMore) + " DAI");
+      console.log("MINTED " + radNeedsMore + " DAI");
     }
 
     if (radInPool.lt(neededRadBal)) {
@@ -208,4 +208,20 @@ async function mintDaiForMember(amtInEth, amtInDai, opt) {
   const _from = opt.from;
   await mintDai(dssCdpManager, amtInEth, amtInDai, true, opt);
   console.log("Minted: " + amtInDai + " DAI for MEMBER:" + opt.from);
+}
+
+const Web3 = require("web3");
+function getTestProvider() {
+  return new Web3.providers.WebsocketProvider("ws://localhost:2000");
+}
+
+async function mineBlock() {
+  const util = require("util");
+  const providerSendAsync = util.promisify(getTestProvider().send).bind(getTestProvider());
+  await providerSendAsync({
+    jsonrpc: "2.0",
+    method: "evm_mine",
+    params: [],
+    id: 1,
+  });
 }
