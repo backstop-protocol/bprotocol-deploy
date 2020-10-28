@@ -208,19 +208,3 @@ async function mintDaiForMember(amtInEth, amtInDai, opt) {
   await mintDai(dssCdpManager, amtInEth, amtInDai, true, opt);
   console.log("Minted: " + amtInDai + " DAI for MEMBER:" + opt.from);
 }
-
-const Web3 = require("web3");
-function getTestProvider() {
-  return new Web3.providers.WebsocketProvider("ws://localhost:2000");
-}
-
-async function mineBlock() {
-  const util = require("util");
-  const providerSendAsync = util.promisify(getTestProvider().send).bind(getTestProvider());
-  await providerSendAsync({
-    jsonrpc: "2.0",
-    method: "evm_mine",
-    params: [],
-    id: 1,
-  });
-}
