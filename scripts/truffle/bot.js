@@ -33,6 +33,7 @@ let MEMBER_1 = bpJSON.MEMBER_1;
 
 const ILK_ETH = web3.utils.padRight(web3.utils.asciiToHex("ETH-A"), 64);
 
+// cdp => pending (bool)
 const pending = new Map();
 
 module.exports = async function (callback) {
@@ -86,9 +87,9 @@ async function processCdps() {
 async function processCdp(cdp) {
   let cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
 
-  if (!cushionInfo.isToppedUp && cushionInfo.canCallTopupNow) {
+  if (cushionInfo.canCallTopupNow) {
     await processTopup(cdp, cushionInfo.cushionSizeInWei);
-  } else if (cushionInfo.isToppedUp && cushionInfo.shouldCallUntop) {
+  } else if (cushionInfo.shouldCallUntop) {
     await processUntop(cdp);
   }
 
@@ -100,7 +101,7 @@ async function processCdp(cdp) {
 }
 
 async function processTopup(cdp, cushionSizeInWei) {
-  await ensureDAIBalance(cdp, new BN(cushionSizeInWei).mul(RAY), { from: MEMBER_1 });
+  await ensureDAIBalance(cdp, new BN(cushionSizeInWei).mul(RAY), MEMBER_1);
   await pool.topup(cdp, { from: MEMBER_1 });
   console.log("### TOPPED-UP ###: " + cdp);
 }
@@ -113,7 +114,7 @@ async function processUntop(cdp) {
 async function processBite(cdp, availableBiteInDaiWei) {
   const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
 
-  await ensureDAIBalance(cdp, new BN(availableBiteInDaiWei).mul(RAY), { from: MEMBER_1 });
+  await ensureDAIBalance(cdp, new BN(availableBiteInDaiWei).mul(RAY), MEMBER_1);
   // bite
   await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
   console.log("### BITTEN ###: " + cdp);
@@ -129,9 +130,10 @@ async function processBite(cdp, availableBiteInDaiWei) {
 }
 
 // Ensure that the MEMBER has expected DAI balance before topup
-async function ensureDAIBalance(cdp, neededRadBal, opt) {
+async function ensureDAIBalance(cdp, neededRadBal, _from) {
   try {
-    const _from = opt.from;
+    // Add 1 DAI to avoid rounding errors
+    neededRadBal = neededRadBal.add(ONE_ETH);
     const radInVat = await vat.dai(_from);
     const radInPool = await pool.rad(_from);
     const radMemberHave = radInPool.add(radInVat);
@@ -144,9 +146,9 @@ async function ensureDAIBalance(cdp, neededRadBal, opt) {
 
     if (radInPool.lt(neededRadBal)) {
       // radNeedsMore = neededRadBal - radInPool + 1e18
-      const radNeedsMore = neededRadBal.sub(radInPool).add(ONE_ETH);
+      const radNeedsMore = neededRadBal.sub(radInPool);
       await pool.deposit(radNeedsMore, { from: _from });
-      console.log("Member:" + _from + " deposited: " + radToDAI(radNeedsMore) + " DAI");
+      console.log("Member:" + _from + " deposited: " + radNeedsMore + " DAI");
     }
   } catch (err) {
     console.log(err);
@@ -154,7 +156,7 @@ async function ensureDAIBalance(cdp, neededRadBal, opt) {
 }
 
 async function init() {
-  await mintDaiForMember(20, 1000, { from: MEMBER_1 });
+  await mintDaiForMember(20, 1000, MEMBER_1);
 
   await vat.hope(pool.address, { from: MEMBER_1 });
   // deposit 1 DAI
@@ -167,8 +169,7 @@ function radToDAI(radVal) {
   return radVal.div(RAD).toString();
 }
 
-async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
-  const _from = opt.from;
+async function mintDai(manager, amtInEth, amtInDai, isMove, _from) {
   const ink = new BN(amtInEth).mul(new BN(ONE_ETH));
   const art = new BN(amtInDai).mul(new BN(ONE_ETH));
 
@@ -203,8 +204,7 @@ async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
   }
 }
 
-async function mintDaiForMember(amtInEth, amtInDai, opt) {
-  const _from = opt.from;
-  await mintDai(dssCdpManager, amtInEth, amtInDai, true, opt);
-  console.log("Minted: " + amtInDai + " DAI for MEMBER:" + opt.from);
+async function mintDaiForMember(amtInEth, amtInDai, _from) {
+  await mintDai(dssCdpManager, amtInEth, amtInDai, true, _from);
+  console.log("Minted: " + amtInDai + " DAI for MEMBER:" + _from);
 }
