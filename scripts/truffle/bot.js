@@ -1,8 +1,10 @@
-const { BN } = require("@openzeppelin/test-helpers");
-const { RAY, RAD, ONE_ETH } = require("../../test-utils/constants");
+"use strict";
+// TODO make sure testcase is using non 1 rate (art to dai rate)
+const { BN, time } = require("@openzeppelin/test-helpers");
+const { RAY, RAD, ONE_ETH, TEN_MINUTES } = require("../../test-utils/constants");
 
-const mcdJSON = require("../../config/mcd_testchain.json");
-const bpJSON = require("../../config/bprotocol_testchain.json");
+const mcdJSON = require("../../config/mcdTestchain.json");
+const bpJSON = require("../../config/bprotocolTestchain.json");
 
 // MCD Contracts
 const DssCdpManager = artifacts.require("DssCdpManager");
@@ -28,6 +30,9 @@ let dssCdpManager;
 let gemJoin;
 let weth;
 let vat;
+let dai;
+let daiJoin;
+let osm;
 
 let MEMBER_1 = bpJSON.MEMBER_1;
 
@@ -55,7 +60,12 @@ module.exports = async function (callback) {
     web3.eth.subscribe("newBlockHeaders", async (error, event) => {
       try {
         if (!error) {
-          console.log("Block: " + event.number);
+          console.log(
+            "Block: " +
+              event.number +
+              " Timestamp: " +
+              (await web3.eth.getBlock("latest")).timestamp
+          );
           await processCdps();
         } else {
           console.log(error);
@@ -85,25 +95,40 @@ async function processCdps() {
 }
 
 async function processCdp(cdp) {
-  let cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
+  try {
+    const cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
+    const biteInfo = await liqInfo.getBiteInfo(cdp, MEMBER_1);
 
-  if (cushionInfo.canCallTopupNow) {
-    await processTopup(cdp, cushionInfo.cushionSizeInWei);
-  } else if (cushionInfo.shouldCallUntop) {
-    await processUntop(cdp);
-  }
+    await depositBeforeTopup(cdp, cushionInfo);
 
-  // Read latest biteInfo just before bite call
-  const biteInfo = await liqInfo.getBiteInfo(cdp, MEMBER_1);
-  if (biteInfo.canCallBiteNow) {
-    await processBite(cdp, biteInfo.availableBiteInDaiWei);
+    if (cushionInfo.canCallTopupNow) {
+      await processTopup(cdp, biteInfo);
+    } else if (cushionInfo.shouldCallUntop) {
+      await processUntop(cdp);
+    }
+
+    if (biteInfo.canCallBiteNow) {
+      await processBite(cdp, biteInfo.availableBiteInDaiWei);
+    }
+  } catch (err) {
+    console.log(err);
   }
 }
 
-async function processTopup(cdp, cushionSizeInWei) {
-  await ensureDAIBalance(cdp, new BN(cushionSizeInWei).mul(RAY), MEMBER_1);
-  await pool.topup(cdp, { from: MEMBER_1 });
-  console.log("### TOPPED-UP ###: " + cdp);
+async function depositBeforeTopup(cdp, ci) {
+  const timeToReachTopup = new BN(ci.minimumTimeBeforeCallingTopup);
+  // console.log("TimeToReachTopup: " + timeToReachTopup.toString());
+  if (timeToReachTopup.lt(TEN_MINUTES)) {
+    await ensureDAIBalance(cdp, new BN(ci.cushionSizeInWei).mul(RAY), MEMBER_1);
+  }
+}
+
+async function processTopup(cdp, bi) {
+  const timeToReachBite = new BN(bi.minimumTimeBeforeCallingBite);
+  if (timeToReachBite.lt(TEN_MINUTES)) {
+    await pool.topup(cdp, { from: MEMBER_1 });
+    console.log("### TOPPED-UP ###: " + cdp);
+  }
 }
 
 async function processUntop(cdp) {
@@ -116,6 +141,8 @@ async function processBite(cdp, availableBiteInDaiWei) {
 
   await ensureDAIBalance(cdp, new BN(availableBiteInDaiWei).mul(RAY), MEMBER_1);
   // bite
+  // TODO have meaningfull minEthReturn, e.g. availableBiteInDaiWei * eth2usdMarketPrice
+  // TODO minEthReturn
   await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
   console.log("### BITTEN ###: " + cdp);
 
@@ -132,6 +159,8 @@ async function processBite(cdp, availableBiteInDaiWei) {
 // Ensure that the MEMBER has expected DAI balance before topup
 async function ensureDAIBalance(cdp, neededRadBal, _from) {
   try {
+    if (neededRadBal.eq(new BN(0))) return;
+
     // Add 1 DAI to avoid rounding errors
     neededRadBal = neededRadBal.add(ONE_ETH);
     const radInVat = await vat.dai(_from);

@@ -14,6 +14,7 @@ const FIFTY_DAI = new BN(50).mul(ONE_ETH);
 
 // TIME
 const ONE_MINUTE = new BN(60);
+const TEN_MINUTES = new BN(10).mul(ONE_MINUTE);
 const ONE_HOUR = new BN(60).mul(ONE_MINUTE);
 
 module.exports = {
@@ -24,5 +25,6 @@ module.exports = {
   HUNDRED_DAI,
   FIFTY_DAI,
   ONE_MINUTE,
+  TEN_MINUTES,
   ONE_HOUR,
 };

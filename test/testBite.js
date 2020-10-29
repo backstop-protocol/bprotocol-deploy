@@ -2,8 +2,8 @@ const BN = require("bn.js");
 const { time } = require("@openzeppelin/test-helpers");
 
 const abiJSON = require("../lib/dss-cdp-manager/out/dapp.sol.json");
-const mcdJSON = require("../config/mcd_testchain.json");
-const bpJSON = require("../config/bprotocol_testchain.json");
+const mcdJSON = require("../config/mcdTestchain.json");
+const bpJSON = require("../config/bprotocolTestchain.json");
 
 const RAY = new BN(10).pow(new BN(27));
 const ONE_ETH = new BN(10).pow(new BN(18));
@@ -45,6 +45,7 @@ contract("Testchain", (accounts) => {
     real = await DSValue.at(bpJSON.PRICE_FEED);
 
     // await init();
+    await syncOSMTime();
   });
 
   it("Test Bite", async () => {
@@ -52,22 +53,22 @@ contract("Testchain", (accounts) => {
     await mintDaiForUser(2, 199, { from: USER_1 });
 
     // 2. setNextPrice
-    const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
-    await time.increase(nextTime);
     await setNextPrice(new BN(145).mul(ONE_ETH));
     await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     console.log("Current price: " + (await getCurrentPrice()).toString());
-    await increaseHalfHour();
 
-    // 3. It should be topped up at Bot
+    // nothing should happen
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
+    // member deposit, 10 mins before topup allowed
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+    // nothing should happen
+    await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+    // member should topup, 10 mins before bite allowed
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    // member should be allowed to bite
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 60 mins passed
 
-    // 4. poke
-    console.log("waiting.....");
-    await sleep(10000);
-
-    // await increaseHalfHour();
-    await increaseHalfHour();
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     await osm.poke();
     await spot.poke(ILK_ETH);
@@ -76,6 +77,16 @@ contract("Testchain", (accounts) => {
     // 5. It should be bitten at Bot
   });
 });
+
+async function syncOSMTime() {
+  await osm.kiss(mcdJSON.DEPLOYER);
+  const pass = await osm.pass({ from: mcdJSON.DEPLOYER });
+  if (pass) await osm.poke();
+  const ts = await time.latest();
+  const zzz = ts.sub(ts.mod(new BN(3600)));
+  const nextTime = zzz.add(new BN(3600));
+  await time.increaseTo(nextTime);
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -102,6 +113,18 @@ async function init() {
 async function increaseHalfHour() {
   const hop = await osm.hop();
   await time.increase(hop / 2 + 1);
+}
+
+async function increaseTime(inMins) {
+  const seconds = new BN(inMins).mul(new BN(60)).add(new BN(1));
+  await time.increase(seconds);
+}
+
+async function increaseTime_MineBlock_Sleep(inMins, inSecs) {
+  await increaseTime(inMins);
+  await mineBlock();
+  console.log("waiting " + inSecs + " seconds...");
+  await sleep(inSecs * 1000);
 }
 
 /*
@@ -198,4 +221,20 @@ function uintToBytes32(val) {
 
 function bytes32ToBN(val) {
   return new BN(web3.utils.hexToNumberString(val));
+}
+
+const Web3 = require("web3");
+function getTestProvider() {
+  return new Web3.providers.WebsocketProvider("ws://localhost:2000");
+}
+
+async function mineBlock() {
+  const util = require("util");
+  const providerSendAsync = util.promisify(getTestProvider().send).bind(getTestProvider());
+  await providerSendAsync({
+    jsonrpc: "2.0",
+    method: "evm_mine",
+    params: [],
+    id: 1,
+  });
 }
