@@ -138,20 +138,14 @@ async function processUntop(cdp) {
 
 async function processBite(cdp, bi) {
   const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
-  // console.log(bi);
+
   await ensureDAIBalance(cdp, new BN(bi.availableBiteInDaiWei).mul(RAY), MEMBER_1);
 
+  const eth2daiPrice = await getEth2DaiMarketPrice();
+  const minEthReturn = new BN(bi.availableBiteInDaiWei).div(eth2daiPrice);
+
   // bite
-  const eth2usdPrice = await getEth2UsdMarketPrice();
-
-  const ethReturn = await liqInfo.getExpectedEthReturn.call(
-    ILK_ETH,
-    bi.availableBiteInDaiWei,
-    eth2usdPrice
-  );
-  console.log("ethReturn " + ethReturn.toString());
-
-  await pool.bite(cdp, avail, ethReturn, { from: MEMBER_1 });
+  await pool.bite(cdp, avail, minEthReturn, { from: MEMBER_1 });
   console.log("### BITTEN ###: " + cdp);
 
   // exit
@@ -164,11 +158,11 @@ async function processBite(cdp, bi) {
   console.log("### WITHDRAWN ###: " + radToDAI(rad) + " DAI");
 }
 
-async function getEth2UsdMarketPrice() {
-  // NOTICE: This ETH to USD rate should be taken from real market. eg. Binance order-book etc.
-  const eth2usdMarketPrice = new BN(145).mul(ONE_ETH);
+async function getEth2DaiMarketPrice() {
+  // NOTICE: This ETH to DAI rate should be taken from real market. eg. Binance order-book etc.
+  const eth2daiMarketPrice = new BN(145);
   // NOTICE: You can get the real market rate here and return from this function.
-  return eth2usdMarketPrice;
+  return eth2daiMarketPrice;
 }
 
 // Ensure that the MEMBER has expected DAI balance before topup
