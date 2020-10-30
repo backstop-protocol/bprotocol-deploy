@@ -1,12 +1,12 @@
 const BN = require("bn.js");
 const { time } = require("@openzeppelin/test-helpers");
+const { increaseTime_MineBlock_Sleep, bytes32ToBN, uintToBytes32 } = require("../test-utils/utils");
+const { RAY, ONE_ETH } = require("../test-utils/constants");
 
 const abiJSON = require("../lib/dss-cdp-manager/out/dapp.sol.json");
 const mcdJSON = require("../config/mcdTestchain.json");
 const bpJSON = require("../config/bprotocolTestchain.json");
 
-const RAY = new BN(10).pow(new BN(27));
-const ONE_ETH = new BN(10).pow(new BN(18));
 const ILK_ETH = web3.utils.padRight(web3.utils.asciiToHex("ETH-A"), 64);
 
 const BCdpManager = artifacts.require("BCdpManager");
@@ -88,10 +88,6 @@ async function syncOSMTime() {
   await time.increaseTo(nextTime);
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /*
 async function init() {
   const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
@@ -107,32 +103,6 @@ async function init() {
   await osm.poke();
 
   console.log("Current price: " + (await getCurrentPrice()).toString());
-}
-*/
-
-async function increaseHalfHour() {
-  const hop = await osm.hop();
-  await time.increase(hop / 2 + 1);
-}
-
-async function increaseTime(inMins) {
-  const seconds = new BN(inMins).mul(new BN(60)).add(new BN(1));
-  await time.increase(seconds);
-}
-
-async function increaseTime_MineBlock_Sleep(inMins, inSecs) {
-  await increaseTime(inMins);
-  await mineBlock();
-  console.log("waiting " + inSecs + " seconds...");
-  await sleep(inSecs * 1000);
-}
-
-/*
-async function setupTestchain() {
-  await mintDaiForMember(20, 1000, { from: MEMBER_1 });
-  // await mintDaiForMember(20, 1000, { from: MEMBER_2 });
-  // await mintDaiForMember(20, 1000, { from: MEMBER_3 });
-  // await mintDaiForMember(20, 1000, { from: MEMBER_4 });
 }
 */
 
@@ -213,28 +183,4 @@ async function getCurrentPrice() {
 async function getNextPrice() {
   const peep = await osm.peep({ from: mcdJSON.DEPLOYER });
   return bytes32ToBN(peep[0]);
-}
-
-function uintToBytes32(val) {
-  return web3.utils.padLeft(web3.utils.numberToHex(val), 64);
-}
-
-function bytes32ToBN(val) {
-  return new BN(web3.utils.hexToNumberString(val));
-}
-
-const Web3 = require("web3");
-function getTestProvider() {
-  return new Web3.providers.WebsocketProvider("ws://localhost:2000");
-}
-
-async function mineBlock() {
-  const util = require("util");
-  const providerSendAsync = util.promisify(getTestProvider().send).bind(getTestProvider());
-  await providerSendAsync({
-    jsonrpc: "2.0",
-    method: "evm_mine",
-    params: [],
-    id: 1,
-  });
 }
