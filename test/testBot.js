@@ -1,4 +1,5 @@
 "use strict";
+
 const BN = require("bn.js");
 const { time } = require("@openzeppelin/test-helpers");
 const {
@@ -7,7 +8,7 @@ const {
   uintToBytes32,
   increaseOneHour,
 } = require("../test-utils/utils");
-const { RAY, ONE_ETH } = require("../test-utils/constants");
+const { WAD, RAY, ONE_ETH, ONE_HOUR } = require("../test-utils/constants");
 
 const mcdJSON = require("../config/mcdTestchain.json");
 const bpJSON = require("../config/bprotocolTestchain.json");
@@ -28,6 +29,9 @@ const GemJoin = artifacts.require("GemJoin");
 const OSM = artifacts.require("OSM");
 const DSValue = artifacts.require("DSValue");
 const Spotter = artifacts.require("Spotter");
+const Cat = artifacts.require("Cat");
+const Vat = artifacts.require("Vat");
+const Jug = artifacts.require("Jug");
 
 // B.Protocol
 let bCdpManager;
@@ -43,6 +47,9 @@ let gemJoin;
 let osm;
 let spot;
 let real;
+let cat;
+let vat;
+let jug;
 
 let USER_1 = "0xda1495ebd7573d8e7f860862baa3abecebfa02e0";
 let USER_2 = "0xb76a5a26ba0041eca3edc28a992e4eb65a3b3d05";
@@ -63,9 +70,14 @@ contract("Testchain", (accounts) => {
     osm = await OSM.at(mcdJSON.PIP_ETH);
     spot = await Spotter.at(mcdJSON.MCD_SPOT);
     real = await DSValue.at(bpJSON.PRICE_FEED);
+    cat = await Cat.at(mcdJSON.MCD_CAT);
+    vat = await Vat.at(mcdJSON.MCD_VAT);
+    jug = await Jug.at(mcdJSON.MCD_JUG);
 
     // dYdX
     dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
+
+    await setMCD();
   });
 
   beforeEach(async () => {
@@ -186,6 +198,19 @@ contract("Testchain", (accounts) => {
   });
 });
 
+async function setMCD() {
+  await jug.drip(ILK_ETH);
+
+  let ilk = await vat.ilks(ILK_ETH);
+  console.log("Vat.ilks('ETH-A').rate: " + ilk.rate.toString());
+
+  ilk = await cat.ilks(ILK_ETH);
+  console.log("Cat.ilks('ETH-A').chop: " + ilk.chop.toString());
+
+  ilk = await jug.ilks(ILK_ETH);
+  console.log("Jug.ilks('ETH-A').duty: " + ilk.duty.toString());
+}
+
 async function getLiquidatorInfo(cdp) {
   const cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
   const biteInfo = await liqInfo.getBiteInfo(cdp, MEMBER_1);
@@ -202,8 +227,8 @@ async function syncOSMTime() {
   const pass = await osm.pass({ from: mcdJSON.DEPLOYER });
   if (pass) await osm.poke();
   const ts = await time.latest();
-  const zzz = ts.sub(ts.mod(new BN(3600)));
-  const nextTime = zzz.add(new BN(3600));
+  const zzz = ts.sub(ts.mod(ONE_HOUR));
+  const nextTime = zzz.add(ONE_HOUR);
   await time.increaseTo(nextTime);
 }
 

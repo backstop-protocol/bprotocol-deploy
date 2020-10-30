@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-if [ -z $1 ]; then
-    echo "NETWORK NOT FOUND"
-    return 1
-fi
-
 # SETUP ENV VARIABLES
 . scripts/env.sh
 

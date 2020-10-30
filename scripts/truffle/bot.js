@@ -1,5 +1,5 @@
 "use strict";
-// TODO make sure testcase is using non 1 rate (art to dai rate)
+
 const { BN, time } = require("@openzeppelin/test-helpers");
 const { RAY, RAD, ONE_ETH, TEN_MINUTES } = require("../../test-utils/constants");
 
