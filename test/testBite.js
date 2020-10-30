@@ -1,29 +1,41 @@
+"use strict";
 const BN = require("bn.js");
 const { time } = require("@openzeppelin/test-helpers");
 const { increaseTime_MineBlock_Sleep, bytes32ToBN, uintToBytes32 } = require("../test-utils/utils");
 const { RAY, ONE_ETH } = require("../test-utils/constants");
 
-const abiJSON = require("../lib/dss-cdp-manager/out/dapp.sol.json");
 const mcdJSON = require("../config/mcdTestchain.json");
 const bpJSON = require("../config/bprotocolTestchain.json");
 
 const ILK_ETH = web3.utils.padRight(web3.utils.asciiToHex("ETH-A"), 64);
 
+// B.Protocol
 const BCdpManager = artifacts.require("BCdpManager");
+const LiquidatorInfo = artifacts.require("LiquidatorInfo");
+
+// dYdX
+const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
+
+// MCD
 const DssCdpManager = artifacts.require("DssCdpManager");
 const WETH = artifacts.require("WETH");
 const GemJoin = artifacts.require("GemJoin");
 const OSM = artifacts.require("OSM");
 const DSValue = artifacts.require("DSValue");
-const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
 const Spotter = artifacts.require("Spotter");
 
+// B.Protocol
 let bCdpManager;
+let liqInfo;
+
+// dYdX
+let dai2usd;
+
+// MCD
 let dssCdpManager;
 let weth;
 let gemJoin;
 let osm;
-let dai2usd;
 let spot;
 let real;
 
@@ -43,14 +55,19 @@ contract("Testchain", (accounts) => {
     dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
     spot = await Spotter.at(mcdJSON.MCD_SPOT);
     real = await DSValue.at(bpJSON.PRICE_FEED);
+    liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
+  });
 
-    // await init();
+  beforeEach(async () => {
     await syncOSMTime();
   });
 
   it("Test Bite", async () => {
+    let ci;
+    let bi;
+
     // 1. Mint
-    await mintDaiForUser(2, 199, { from: USER_1 });
+    const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
 
     // 2. setNextPrice
     await setNextPrice(new BN(145).mul(ONE_ETH));
@@ -60,23 +77,40 @@ contract("Testchain", (accounts) => {
 
     // nothing should happen
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
     // member deposit, 10 mins before topup allowed
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+
     // nothing should happen
     await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+
     // member should topup, 10 mins before bite allowed
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(true).to.be.equal(ci.isToppedUp);
+
     // member should be allowed to bite
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 60 mins passed
 
+    // After 1 hour poke, to update price
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     await osm.poke();
     await spot.poke(ILK_ETH);
+
     console.log("Current price: " + (await getCurrentPrice()).toString());
 
     // 5. It should be bitten at Bot
   });
 });
+
+async function getLiquidatorInfo(cdp) {
+  const cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
+  const biteInfo = await liqInfo.getBiteInfo(cdp, MEMBER_1);
+  return [cushionInfo, biteInfo];
+}
 
 async function syncOSMTime() {
   await osm.kiss(mcdJSON.DEPLOYER);
