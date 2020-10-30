@@ -1,6 +1,6 @@
 "use strict";
 
-const { BN, time } = require("@openzeppelin/test-helpers");
+const { BN } = require("@openzeppelin/test-helpers");
 const { RAY, RAD, ONE_ETH, TEN_MINUTES } = require("../../test-utils/constants");
 
 const mcdJSON = require("../../config/mcdTestchain.json");
@@ -171,7 +171,7 @@ async function ensureDAIBalance(cdp, neededRadBal, _from) {
     if (neededRadBal.eq(new BN(0))) return;
 
     // Add 1 DAI to avoid rounding errors
-    neededRadBal = neededRadBal.add(ONE_ETH);
+    neededRadBal = neededRadBal.add(RAD);
     const radInVat = await vat.dai(_from);
     const radInPool = await pool.rad(_from);
     const radMemberHave = radInPool.add(radInVat);
