@@ -23,7 +23,6 @@ const BudConnector = artifacts.require("BudConnector");
 const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
 
 // MCD
-const DssCdpManager = artifacts.require("DssCdpManager");
 const WETH = artifacts.require("WETH");
 const GemJoin = artifacts.require("GemJoin");
 const OSM = artifacts.require("OSM");
@@ -39,7 +38,6 @@ let bud;
 let dai2usd;
 
 // MCD
-let dssCdpManager;
 let weth;
 let gemJoin;
 let osm;
@@ -59,7 +57,6 @@ contract("Testchain", (accounts) => {
     bud = await BudConnector.at(bpJSON.BUD_CONN_ETH);
 
     // MCD
-    dssCdpManager = await DssCdpManager.at(mcdJSON.CDP_MANAGER);
     gemJoin = await GemJoin.at(mcdJSON.MCD_JOIN_ETH_A);
     const gem = await gemJoin.gem();
     weth = await WETH.at(gem);
@@ -79,11 +76,11 @@ contract("Testchain", (accounts) => {
     let ci;
     let bi;
 
-    // 1. Mint
+    // Mint
     const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
     console.log("New CDP: " + cdp + " opened");
 
-    // 2. setNextPrice
+    // setNextPrice
     await setNextPrice(new BN(145).mul(ONE_ETH));
     await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
@@ -100,23 +97,20 @@ contract("Testchain", (accounts) => {
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
-    
 
     // member deposit, 10 mins before topup allowed
     console.log(
       "20 mins passed. Member should deposit now (which is 10 mins before topup allowed)."
     );
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
-    
 
     // nothing should happen
     console.log("40 mins passed. Nothing should happen for cdp.");
     await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
-    
 
     // member should topup, 10 mins before bite allowed
     console.log("50 mins passed. Member should topup now (which is 10 mins before bite allowed).");
-    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed    
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(true).to.be.equal(ci.isToppedUp);
 
@@ -131,7 +125,64 @@ contract("Testchain", (accounts) => {
 
     console.log("Current price: " + (await getCurrentPrice()).toString());
 
-    // 5. It should be bitten at Bot
+    await increaseTime_MineBlock_Sleep(1, 10);
+
+    // NOTICE: It should be bitten at Bot
+  });
+
+  it("Test untop", async () => {
+    let ci;
+    let bi;
+
+    const cdp = await mintDaiForUser(2, 199, { from: USER_2 });
+    console.log("New CDP: " + cdp + " opened");
+
+    // setNextPrice
+    await setNextPrice(new BN(145).mul(ONE_ETH));
+    await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
+    await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+
+    await syncOSMTime();
+    await osm.poke();
+    await spot.poke(ILK_ETH);
+    console.log("## Current price: " + (await getCurrentPrice()).toString());
+    console.log("## Next price: " + (await getNextPrice()).toString());
+
+    // nothing should happen
+    console.log("10 mins passed. Nothing should happen for cdp.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
+    // member deposit, 10 mins before topup allowed
+    console.log(
+      "20 mins passed. Member should deposit now (which is 10 mins before topup allowed)."
+    );
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+
+    // nothing should happen
+    console.log("40 mins passed. Nothing should happen for cdp.");
+    await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+
+    // member should topup, 10 mins before bite allowed
+    console.log("50 mins passed. Member should topup now (which is 10 mins before bite allowed).");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(true).to.be.equal(ci.isToppedUp);
+
+    // NOTICE: It should be topped up at Bot
+
+    await increaseTime_MineBlock_Sleep(1, 5);
+
+    // Repay 90 DAI
+    const repayDAI = new BN(90).mul(ONE_ETH).mul(new BN(-1));
+    await bCdpManager.frob(cdp, 0, repayDAI, { from: USER_2 });
+
+    console.log("52 mins passed. User repayed. Member should untop");
+    await increaseTime_MineBlock_Sleep(1, 10);
+
+    // NOTICE: It should be untopped at Bot
   });
 });
 
@@ -157,6 +208,7 @@ async function syncOSMTime() {
 }
 
 async function resetPrice() {
+  console.log("#### RESETING SNAPSHOT PRICES ####");
   await setPermissions();
 
   await syncOSMTime();
@@ -186,7 +238,7 @@ async function resetPrice() {
   console.log("Real price: " + bytes32ToBN(await real.read()).toString());
   console.log("Bud price: " + bytes32ToBN(await bud.read(ILK_ETH)).toString());
 
-  // await syncOSMTime();
+  console.log("#### RESETING DONE ####");
 }
 
 async function mintDaiForUser(amtInEth, amtInDai, opt) {
@@ -194,15 +246,6 @@ async function mintDaiForUser(amtInEth, amtInDai, opt) {
   console.log("Minted: " + amtInDai + " DAI for USER:" + opt.from);
   return cdp;
 }
-
-/*
-async function mintDaiForMember(amtInEth, amtInDai, opt) {
-  const _from = opt.from;
-  const cdp = await mintDai(dssCdpManager, amtInEth, amtInDai, true, opt);
-  console.log("Minted: " + amtInDai + " DAI for MEMBER:" + opt.from);
-  return cdp;
-}
-*/
 
 async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
   const _from = opt.from;
