@@ -108,7 +108,7 @@ async function processCdp(cdp) {
     }
 
     if (biteInfo.canCallBiteNow) {
-      await processBite(cdp, biteInfo.availableBiteInDaiWei);
+      await processBite(cdp, biteInfo);
     }
   } catch (err) {
     console.log(err);
@@ -136,14 +136,22 @@ async function processUntop(cdp) {
   console.log("### UN-TOPPED ###: " + cdp);
 }
 
-async function processBite(cdp, availableBiteInDaiWei) {
+async function processBite(cdp, bi) {
   const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
+  // console.log(bi);
+  await ensureDAIBalance(cdp, new BN(bi.availableBiteInDaiWei).mul(RAY), MEMBER_1);
 
-  await ensureDAIBalance(cdp, new BN(availableBiteInDaiWei).mul(RAY), MEMBER_1);
   // bite
-  // TODO have meaningfull minEthReturn, e.g. availableBiteInDaiWei * eth2usdMarketPrice
-  // TODO minEthReturn
-  await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
+  const eth2usdPrice = await getEth2UsdMarketPrice();
+
+  const ethReturn = await liqInfo.getExpectedEthReturn.call(
+    ILK_ETH,
+    bi.availableBiteInDaiWei,
+    eth2usdPrice
+  );
+  console.log("ethReturn " + ethReturn.toString());
+
+  await pool.bite(cdp, avail, ethReturn, { from: MEMBER_1 });
   console.log("### BITTEN ###: " + cdp);
 
   // exit
@@ -154,6 +162,13 @@ async function processBite(cdp, availableBiteInDaiWei) {
   const rad = await pool.rad(MEMBER_1);
   await pool.withdraw(rad, { from: MEMBER_1 });
   console.log("### WITHDRAWN ###: " + radToDAI(rad) + " DAI");
+}
+
+async function getEth2UsdMarketPrice() {
+  // NOTICE: This ETH to USD rate should be taken from real market. eg. Binance order-book etc.
+  const eth2usdMarketPrice = new BN(145).mul(ONE_ETH);
+  // NOTICE: You can get the real market rate here and return from this function.
+  return eth2usdMarketPrice;
 }
 
 // Ensure that the MEMBER has expected DAI balance before topup
@@ -170,14 +185,14 @@ async function ensureDAIBalance(cdp, neededRadBal, _from) {
       // mint more DAI
       const radNeedsMore = neededRadBal.sub(radMemberHave);
       await manager.frob(cdp, 0, radNeedsMore, { from: _from });
-      console.log("MINTED " + radNeedsMore + " DAI");
+      console.log("MINTED " + radToDAI(radNeedsMore) + " DAI");
     }
 
     if (radInPool.lt(neededRadBal)) {
       // radNeedsMore = neededRadBal - radInPool + 1e18
       const radNeedsMore = neededRadBal.sub(radInPool);
       await pool.deposit(radNeedsMore, { from: _from });
-      console.log("Member:" + _from + " deposited: " + radNeedsMore + " DAI");
+      console.log("Member:" + _from + " deposited: " + radToDAI(radNeedsMore) + " DAI");
     }
   } catch (err) {
     console.log(err);
