@@ -178,7 +178,7 @@ async function ensureDAIBalance(cdp, neededRadBal, _from) {
     if (radMemberHave.lt(neededRadBal)) {
       // mint more DAI
       const radNeedsMore = neededRadBal.sub(radMemberHave);
-      await manager.frob(cdp, 0, radNeedsMore, { from: _from });
+      await dssCdpManager.frob(cdp, 0, radNeedsMore, { from: _from });
       console.log("MINTED " + radToDAI(radNeedsMore) + " DAI");
     }
 

@@ -1,7 +1,12 @@
 "use strict";
 const BN = require("bn.js");
 const { time } = require("@openzeppelin/test-helpers");
-const { increaseTime_MineBlock_Sleep, bytes32ToBN, uintToBytes32 } = require("../test-utils/utils");
+const {
+  increaseTime_MineBlock_Sleep,
+  bytes32ToBN,
+  uintToBytes32,
+  increaseOneHour,
+} = require("../test-utils/utils");
 const { RAY, ONE_ETH } = require("../test-utils/constants");
 
 const mcdJSON = require("../config/mcdTestchain.json");
@@ -12,6 +17,7 @@ const ILK_ETH = web3.utils.padRight(web3.utils.asciiToHex("ETH-A"), 64);
 // B.Protocol
 const BCdpManager = artifacts.require("BCdpManager");
 const LiquidatorInfo = artifacts.require("LiquidatorInfo");
+const BudConnector = artifacts.require("BudConnector");
 
 // dYdX
 const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
@@ -27,6 +33,7 @@ const Spotter = artifacts.require("Spotter");
 // B.Protocol
 let bCdpManager;
 let liqInfo;
+let bud;
 
 // dYdX
 let dai2usd;
@@ -46,20 +53,26 @@ let MEMBER_1 = bpJSON.MEMBER_1;
 
 contract("Testchain", (accounts) => {
   before(async () => {
+    // B.Protocol
     bCdpManager = await BCdpManager.at(bpJSON.B_CDP_MANAGER);
+    liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
+    bud = await BudConnector.at(bpJSON.BUD_CONN_ETH);
+
+    // MCD
     dssCdpManager = await DssCdpManager.at(mcdJSON.CDP_MANAGER);
     gemJoin = await GemJoin.at(mcdJSON.MCD_JOIN_ETH_A);
     const gem = await gemJoin.gem();
     weth = await WETH.at(gem);
     osm = await OSM.at(mcdJSON.PIP_ETH);
-    dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
     spot = await Spotter.at(mcdJSON.MCD_SPOT);
     real = await DSValue.at(bpJSON.PRICE_FEED);
-    liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
+
+    // dYdX
+    dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
   });
 
   beforeEach(async () => {
-    await syncOSMTime();
+    await resetPrice();
   });
 
   it("Test Bite", async () => {
@@ -68,27 +81,42 @@ contract("Testchain", (accounts) => {
 
     // 1. Mint
     const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
+    console.log("New CDP: " + cdp + " opened");
 
     // 2. setNextPrice
     await setNextPrice(new BN(145).mul(ONE_ETH));
     await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
-    console.log("Current price: " + (await getCurrentPrice()).toString());
+
+    await syncOSMTime();
+    await osm.poke();
+    await spot.poke(ILK_ETH);
+    console.log("## Current price: " + (await getCurrentPrice()).toString());
+    console.log("## Next price: " + (await getNextPrice()).toString());
 
     // nothing should happen
+    console.log("10 mins passed. Nothing should happen for cdp.");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
+    
 
     // member deposit, 10 mins before topup allowed
+    console.log(
+      "20 mins passed. Member should deposit now (which is 10 mins before topup allowed)."
+    );
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+    
 
     // nothing should happen
+    console.log("40 mins passed. Nothing should happen for cdp.");
     await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+    
 
     // member should topup, 10 mins before bite allowed
-    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    console.log("50 mins passed. Member should topup now (which is 10 mins before bite allowed).");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed    
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(true).to.be.equal(ci.isToppedUp);
 
@@ -99,6 +127,7 @@ contract("Testchain", (accounts) => {
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     await osm.poke();
     await spot.poke(ILK_ETH);
+    console.log("60 mins passed. Member should bite.");
 
     console.log("Current price: " + (await getCurrentPrice()).toString());
 
@@ -112,8 +141,13 @@ async function getLiquidatorInfo(cdp) {
   return [cushionInfo, biteInfo];
 }
 
-async function syncOSMTime() {
+async function setPermissions() {
   await osm.kiss(mcdJSON.DEPLOYER);
+  // Authorizing DEPLOYER to read price from BudConnector in this test
+  await bud.authorize(mcdJSON.DEPLOYER);
+}
+
+async function syncOSMTime() {
   const pass = await osm.pass({ from: mcdJSON.DEPLOYER });
   if (pass) await osm.poke();
   const ts = await time.latest();
@@ -122,23 +156,38 @@ async function syncOSMTime() {
   await time.increaseTo(nextTime);
 }
 
-/*
-async function init() {
-  const nextTime = Number(await osm.zzz()) + parseInt(Number(await osm.hop()) / 2) + 1;
-  await time.increase(nextTime);
+async function resetPrice() {
+  await setPermissions();
 
-  await osm.kiss(mcdJSON.DEPLOYER);
-  const val = await DSValue.at(mcdJSON.VAL_ETH);
-  const bytes32 = uintToBytes32(new BN(150).mul(ONE_ETH));
-  await val.poke(bytes32);
+  await syncOSMTime();
+
+  // OSM Price
+  // set as current price in next poke
+  await setNextPrice(new BN(150).mul(ONE_ETH));
+  await increaseOneHour();
   await osm.poke();
+  await spot.poke(ILK_ETH);
 
-  await time.increase(3600);
+  // set as next price
+  await setNextPrice(new BN(150).mul(ONE_ETH));
+  await increaseOneHour();
   await osm.poke();
+  await spot.poke(ILK_ETH);
 
-  console.log("Current price: " + (await getCurrentPrice()).toString());
+  // dYdX price
+  await dai2usd.setPrice(new BN(150).mul(ONE_ETH));
+
+  // Real price
+  await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
+
+  console.log("OSM Current price: " + (await getCurrentPrice()).toString());
+  console.log("OSM Next price: " + (await getNextPrice()).toString());
+  console.log("dYdX Price: " + (await dai2usd.getMarketPrice(3)).toString());
+  console.log("Real price: " + bytes32ToBN(await real.read()).toString());
+  console.log("Bud price: " + bytes32ToBN(await bud.read(ILK_ETH)).toString());
+
+  // await syncOSMTime();
 }
-*/
 
 async function mintDaiForUser(amtInEth, amtInDai, opt) {
   const cdp = await mintDai(bCdpManager, amtInEth, amtInDai, false, opt);
@@ -199,13 +248,15 @@ async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
 async function setNextPrice(price) {
   console.log("Current price: " + (await getCurrentPrice()).toString());
 
-  await osm.kiss(mcdJSON.DEPLOYER);
   const val = await DSValue.at(mcdJSON.VAL_ETH);
   const bytes32 = uintToBytes32(price);
   await val.poke(bytes32);
 
   const pass = await osm.pass({ from: mcdJSON.DEPLOYER });
-  if (pass) await osm.poke();
+  if (pass) {
+    await osm.poke();
+    await spot.poke(ILK_ETH);
+  }
   console.log("Next price: " + (await getNextPrice()).toString());
 }
 
