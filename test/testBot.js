@@ -60,7 +60,7 @@ contract("Testchain", (accounts) => {
   before(async () => {
     // B.Protocol
     bCdpManager = await BCdpManager.at(bpJSON.B_CDP_MANAGER);
-    liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
+    liqInfo = await LiquidatorInfo.at(bpJSON.LIQUIDATOR_INFO);
     bud = await BudConnector.at(bpJSON.BUD_CONN_ETH);
 
     // MCD

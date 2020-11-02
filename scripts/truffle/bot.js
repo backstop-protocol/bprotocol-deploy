@@ -52,7 +52,7 @@ module.exports = async function (callback) {
     vat = await Vat.at(mcdJSON.MCD_VAT);
     osm = await OSM.at(mcdJSON.PIP_ETH);
     weth = await WETH9.at(await gemJoin.gem());
-    liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
+    liqInfo = await LiquidatorInfo.at(bpJSON.LIQUIDATOR_INFO);
 
     // initialize
     await init();

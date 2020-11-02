@@ -155,11 +155,11 @@ if [ -z "${MIGRATE}" ]; then
     verifyDeploy $MIGRATE && export MIGRATE=$MIGRATE
 fi
 
-# Deploy FlatLiquidatorInfo
+# Deploy LiquidatorInfo
 # ctor args = manager_
-if [ -z "${FLATLIQUIDATOR_INFO}" ]; then
-    FLATLIQUIDATOR_INFO=$(dapp create FlatLiquidatorInfo $B_CDP_MANAGER $CHAINLINK)
-    verifyDeploy $FLATLIQUIDATOR_INFO && export FLATLIQUIDATOR_INFO=$FLATLIQUIDATOR_INFO
+if [ -z "${LIQUIDATOR_INFO}" ]; then
+    LIQUIDATOR_INFO=$(dapp create LiquidatorInfo $B_CDP_MANAGER $CHAINLINK)
+    verifyDeploy $LIQUIDATOR_INFO && export LIQUIDATOR_INFO=$LIQUIDATOR_INFO
 fi
 
 # Deploy LiquidatorBalanceInfo
@@ -251,7 +251,7 @@ echo MEMBERS=$MEMBERS
 echo GOV_EXECUTOR=$GOV_EXECUTOR
 echo MIGRATE=$MIGRATE
 echo B_PROXY_ACTIONS=$B_PROXY_ACTIONS
-echo FLATLIQUIDATOR_INFO=$FLATLIQUIDATOR_INFO
+echo LIQUIDATOR_INFO=$LIQUIDATOR_INFO
 echo LIQUIDATOR_BAL_INFO=$LIQUIDATOR_BAL_INFO
 echo "##################################"
 
