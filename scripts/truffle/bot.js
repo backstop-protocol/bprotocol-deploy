@@ -96,8 +96,16 @@ async function processCdps() {
 
 async function processCdp(cdp) {
   try {
-    const cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
-    const biteInfo = await liqInfo.getBiteInfo(cdp, MEMBER_1);
+    const cdpInfo = await liqInfo.getCdpData.call(
+      cdp,
+      cdp,
+      MEMBER_1,
+      await getEth2DaiMarketPrice(),
+      { gas: 50e6 } // Higher gas limit needed to execute
+    );
+
+    const cushionInfo = cdpInfo[0].cushion;
+    const biteInfo = cdpInfo[0].bite;
 
     await depositBeforeTopup(cdp, cushionInfo);
 

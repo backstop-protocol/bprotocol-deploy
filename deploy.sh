@@ -162,6 +162,12 @@ if [ -z "${FLATLIQUIDATOR_INFO}" ]; then
     verifyDeploy $FLATLIQUIDATOR_INFO && export FLATLIQUIDATOR_INFO=$FLATLIQUIDATOR_INFO
 fi
 
+# Deploy LiquidatorBalanceInfo
+if [ -z "${LIQUIDATOR_BAL_INFO}" ]; then
+    LIQUIDATOR_BAL_INFO=$(dapp create LiquidatorBalanceInfo)
+    verifyDeploy $LIQUIDATOR_BAL_INFO && export LIQUIDATOR_BAL_INFO=$LIQUIDATOR_BAL_INFO
+fi
+
 
 ### DEPLOYMENT DONE ####
 
@@ -246,6 +252,7 @@ echo GOV_EXECUTOR=$GOV_EXECUTOR
 echo MIGRATE=$MIGRATE
 echo B_PROXY_ACTIONS=$B_PROXY_ACTIONS
 echo FLATLIQUIDATOR_INFO=$FLATLIQUIDATOR_INFO
+echo LIQUIDATOR_BAL_INFO=$LIQUIDATOR_BAL_INFO
 echo "##################################"
 
 # VALIDATE DEPLOYMENT

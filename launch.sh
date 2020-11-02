@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 ##### Launch BProtocol snapshot #####
-export ETH_GAS=10000000
+# Higher gas limit 100 million to allow heavy ".call" functions
+export ETH_GAS=100000000
 
 # Read bprotocol snapshot from folder, error if not present
 cp snapshots/$1.tgz ./testchain/snapshots
