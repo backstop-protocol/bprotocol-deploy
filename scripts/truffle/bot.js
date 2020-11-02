@@ -101,13 +101,15 @@ async function processCdp(cdp) {
       cdp,
       MEMBER_1,
       await getEth2DaiMarketPrice(),
-      { gas: 50e6 } // Higher gas limit needed to execute
+      { gas: 100e6 } // Higher gas limit needed to execute
     );
 
     const cushionInfo = cdpInfo[0].cushion;
     const biteInfo = cdpInfo[0].bite;
 
-    await depositBeforeTopup(cdp, cushionInfo);
+    if (cushionInfo.shouldProvideCushion) {
+      await depositBeforeTopup(cdp, cushionInfo);
+    }
 
     if (cushionInfo.canCallTopupNow) {
       await processTopup(cdp, biteInfo);
