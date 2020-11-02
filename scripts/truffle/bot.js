@@ -101,7 +101,7 @@ async function processCdp(cdp) {
       cdp,
       MEMBER_1,
       await getEth2DaiMarketPrice(),
-      { gas: 100e6 } // Higher gas limit needed to execute
+      { gas: 12.5e6 } // Higher gas limit needed to execute
     );
 
     const cushionInfo = cdpInfo[0].cushion;
