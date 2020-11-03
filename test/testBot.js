@@ -93,7 +93,6 @@ contract("Testchain", (accounts) => {
     await resetPrice();
   });
 
-  /*
   it("Test Bite", async () => {
     let ci;
     let bi;
@@ -104,8 +103,8 @@ contract("Testchain", (accounts) => {
 
     // setNextPrice
     await setNextPrice(new BN(145).mul(ONE_ETH));
-    await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+    await setChainlinkPrice(new BN(145));
 
     await syncOSMTime();
     await osm.poke();
@@ -161,8 +160,8 @@ contract("Testchain", (accounts) => {
 
     // setNextPrice
     await setNextPrice(new BN(145).mul(ONE_ETH));
-    await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+    await setChainlinkPrice(new BN(145));
 
     await syncOSMTime();
     await osm.poke();
@@ -206,7 +205,6 @@ contract("Testchain", (accounts) => {
 
     // NOTICE: It should be untopped at Bot
   });
-  */
 
   it("Test chainlink low price", async () => {
     let ci;
@@ -217,8 +215,8 @@ contract("Testchain", (accounts) => {
 
     // setNextPrice
     await setNextPrice(new BN(145).mul(ONE_ETH));
-    await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+    await setChainlinkPrice(new BN(145));
 
     await syncOSMTime();
     await osm.poke();
@@ -234,22 +232,35 @@ contract("Testchain", (accounts) => {
     expect(false).to.be.equal(bi.canCallBiteNow);
 
     // set chainlink price
-    const newPrice = new BN(110).mul(ONE_ETH);
-    await chainlink.setPrice(newPrice);
+    await setChainlinkPrice(new BN(110));
 
     // member deposit, 10 mins before topup allowed
     console.log("20 mins passed, No deposit should happen, as chainline price is better");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
 
     // nothing should happen
     console.log("40 mins passed. Nothing should happen.");
     await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
 
     // member should topup, 10 mins before bite allowed
     console.log("50 mins passed. Nothing should happen.");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
   });
 });
+
+async function setChainlinkPrice(newPrice) {
+  console.log("Setting Chainlink price to " + newPrice.toString());
+  await chainlink.setPrice(ONE_ETH.div(newPrice));
+}
 
 async function setMCD() {
   await jug.drip(ILK_ETH);
@@ -305,10 +316,13 @@ async function resetPrice() {
   await spot.poke(ILK_ETH);
 
   // dYdX price
-  await dai2usd.setPrice(new BN(150).mul(ONE_ETH));
+  await dai2usd.setPrice(ONE_ETH);
 
   // Real price
   await real.poke(uintToBytes32(new BN(150).mul(ONE_ETH)));
+
+  // Chainlink price
+  await setChainlinkPrice(new BN(150));
 
   console.log("OSM Current price: " + (await getCurrentPrice()).toString());
   console.log("OSM Next price: " + (await getNextPrice()).toString());

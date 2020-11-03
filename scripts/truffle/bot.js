@@ -102,14 +102,17 @@ async function processCdp(cdp, medianizerPrice) {
       { gas: 12.5e6 } // Higher gas limit needed to execute
     );
 
+    const vaultInfo = cdpInfo[0].vault;
     const cushionInfo = cdpInfo[0].cushion;
     const biteInfo = cdpInfo[0].bite;
 
-    if (cushionInfo.shouldProvideCushion) {
+    const isEthReturnedBetter = vaultInfo.expectedEthReturnBetterThanChainlinkPrice;
+
+    if (cushionInfo.shouldProvideCushion && isEthReturnedBetter) {
       await depositBeforeTopup(cdp, cushionInfo);
     }
 
-    if (cushionInfo.canCallTopupNow) {
+    if (cushionInfo.canCallTopupNow && isEthReturnedBetter) {
       await processTopup(cdp, biteInfo);
     } else if (cushionInfo.shouldCallUntop) {
       await processUntop(cdp);
