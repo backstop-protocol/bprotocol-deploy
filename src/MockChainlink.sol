@@ -1,5 +1,17 @@
 pragma solidity ^0.5.12;
 
 contract MockChainLink {
-    function latestAnswer() external pure returns(int) { return 0; }
+    int price;
+
+    constructor(int _price) public {
+        price = _price;
+    }
+    
+    function setPrice(int _price) external {
+        price = _price;
+    }
+    
+    function latestAnswer() external view returns(int) {
+        return price;
+    }
 }
