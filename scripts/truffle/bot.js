@@ -19,6 +19,7 @@ const OSM = artifacts.require("OSM");
 const BCdpManager = artifacts.require("BCdpManager");
 const Pool = artifacts.require("Pool");
 const LiquidatorInfo = artifacts.require("LiquidatorInfo");
+const BudConnector = artifacts.require("BudConnector");
 
 // B.Protocol
 let bCdpManager;
@@ -33,6 +34,7 @@ let vat;
 let dai;
 let daiJoin;
 let osm;
+let medianizer;
 
 let MEMBER_1 = bpJSON.MEMBER_1;
 
@@ -75,12 +77,13 @@ module.exports = async function (callback) {
 };
 
 async function processCdps() {
-  let maxCdp = await bCdpManager.cdpi();
+  const maxCdp = await bCdpManager.cdpi();
+  const medianizerPrice = await getMedianizerPrice();
   for (let cdp = 1; cdp <= maxCdp; cdp++) {
     if (!pending.get(cdp)) {
       pending.set(cdp, true);
       try {
-        await processCdp(cdp);
+        await processCdp(cdp, medianizerPrice);
       } catch (err) {
         console.log(err);
       }
@@ -89,13 +92,13 @@ async function processCdps() {
   }
 }
 
-async function processCdp(cdp) {
+async function processCdp(cdp, medianizerPrice) {
   try {
     const cdpInfo = await liqInfo.getCdpData.call(
       cdp,
       cdp,
       MEMBER_1,
-      await getEth2DaiMarketPrice(),
+      medianizerPrice,
       { gas: 12.5e6 } // Higher gas limit needed to execute
     );
 
@@ -170,6 +173,11 @@ async function getEth2DaiMarketPrice() {
   return eth2daiMarketPrice;
 }
 
+async function getMedianizerPrice() {
+  const val = await medianizer.read(ILK_ETH, { from: bpJSON.B_CDP_MANAGER });
+  return web3.utils.hexToNumberString(val);
+}
+
 // Ensure that the MEMBER has expected DAI balance before topup
 async function ensureDAIBalance(cdp, neededRadBal, _from) {
   try {
@@ -199,9 +207,13 @@ async function ensureDAIBalance(cdp, neededRadBal, _from) {
 }
 
 async function init() {
+  const real = await bCdpManager.real();
+  medianizer = await BudConnector.at(real);
+
   await mintDaiForMember(20, 1000, MEMBER_1);
 
   await vat.hope(pool.address, { from: MEMBER_1 });
+
   // deposit 1 DAI
   const depositRad = ONE_ETH.mul(RAY);
   await pool.deposit(depositRad, { from: MEMBER_1 });
