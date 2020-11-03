@@ -60,12 +60,7 @@ module.exports = async function (callback) {
     web3.eth.subscribe("newBlockHeaders", async (error, event) => {
       try {
         if (!error) {
-          console.log(
-            "Block: " +
-              event.number +
-              " Timestamp: " +
-              (await web3.eth.getBlock("latest")).timestamp
-          );
+          console.log("Block: " + event.number + " Timestamp: " + event.timestamp);
           await processCdps();
         } else {
           console.log(error);
