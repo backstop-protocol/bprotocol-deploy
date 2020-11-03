@@ -23,6 +23,9 @@ const BudConnector = artifacts.require("BudConnector");
 // dYdX
 const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
 
+// Chainlink
+const MockChainlink = artifacts.require("MockChainlink");
+
 // MCD
 const WETH = artifacts.require("WETH");
 const GemJoin = artifacts.require("GemJoin");
@@ -40,6 +43,9 @@ let bud;
 
 // dYdX
 let dai2usd;
+
+// Chainlink
+let chainlink;
 
 // MCD
 let weth;
@@ -77,6 +83,9 @@ contract("Testchain", (accounts) => {
     // dYdX
     dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
 
+    // Chainlink
+    chainlink = await MockChainlink.at(bpJSON.CHAINLINK);
+
     await setMCD();
   });
 
@@ -84,6 +93,7 @@ contract("Testchain", (accounts) => {
     await resetPrice();
   });
 
+  /*
   it("Test Bite", async () => {
     let ci;
     let bi;
@@ -195,6 +205,49 @@ contract("Testchain", (accounts) => {
     await increaseTime_MineBlock_Sleep(1, 10);
 
     // NOTICE: It should be untopped at Bot
+  });
+  */
+
+  it("Test chainlink low price", async () => {
+    let ci;
+    let bi;
+
+    const cdp = await mintDaiForUser(2, 199, { from: USER_2 });
+    console.log("New CDP: " + cdp + " opened");
+
+    // setNextPrice
+    await setNextPrice(new BN(145).mul(ONE_ETH));
+    await dai2usd.setPrice(new BN(145).mul(ONE_ETH));
+    await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+
+    await syncOSMTime();
+    await osm.poke();
+    await spot.poke(ILK_ETH);
+    console.log("## Current price: " + (await getCurrentPrice()).toString());
+    console.log("## Next price: " + (await getNextPrice()).toString());
+
+    // nothing should happen
+    console.log("10 mins passed. Nothing should happen for cdp.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
+    // set chainlink price
+    const newPrice = new BN(110).mul(ONE_ETH);
+    await chainlink.setPrice(newPrice);
+
+    // member deposit, 10 mins before topup allowed
+    console.log("20 mins passed, No deposit should happen, as chainline price is better");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+
+    // nothing should happen
+    console.log("40 mins passed. Nothing should happen.");
+    await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+
+    // member should topup, 10 mins before bite allowed
+    console.log("50 mins passed. Nothing should happen.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
   });
 });
 
