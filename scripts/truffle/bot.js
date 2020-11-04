@@ -106,13 +106,20 @@ async function processCdp(cdp, medianizerPrice) {
     const cushionInfo = cdpInfo[0].cushion;
     const biteInfo = cdpInfo[0].bite;
 
+    // isExpectedEthLessThanCollateral = expectedEth > Cdp-Collateral
+    const expectedEth = new BN(vaultInfo.expectedEthReturnWithCurrentPrice);
+    const cdpInk = await getInk(cdp);
+    const isExpectedEthLessThanCollateral = expectedEth.lt(cdpInk);
+
     const priceFeedOk = vaultInfo.expectedEthReturnBetterThanChainlinkPrice;
 
-    if (cushionInfo.shouldProvideCushion && priceFeedOk) {
+    const shouldDepositOrTopup = priceFeedOk && isExpectedEthLessThanCollateral;
+
+    if (cushionInfo.shouldProvideCushion && shouldDepositOrTopup) {
       await depositBeforeTopup(cdp, cushionInfo);
     }
 
-    if (cushionInfo.canCallTopupNow && priceFeedOk) {
+    if (cushionInfo.canCallTopupNow && shouldDepositOrTopup) {
       await processTopup(cdp, biteInfo);
     } else if (cushionInfo.shouldCallUntop) {
       await processUntop(cdp);
@@ -124,6 +131,12 @@ async function processCdp(cdp, medianizerPrice) {
   } catch (err) {
     console.log(err);
   }
+}
+
+async function getInk(cdp) {
+  const urn = await bCdpManager.urns(cdp);
+  const result = await vat.urns(ILK_ETH, urn);
+  return result.ink;
 }
 
 async function depositBeforeTopup(cdp, ci) {
