@@ -8,8 +8,8 @@ setupTestchain() {
     echo "TESTCHAIN SPECIFIC SETUP ..."
 
     # Deploy WETH
-    WETH=$(dapp create WETH)
-    verifyDeploy $WETH && export WETH=$WETH
+    # WETH=$(dapp create WETH)
+    # verifyDeploy $WETH && export WETH=$WETH
 
     # MINT WBTC FOR MEMBERS
 

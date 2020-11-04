@@ -1,0 +1,1 @@
+{ "contractName" : "TestFullAssemblyContract", "abi" : [{"payable":false,"stateMutability":"nonpayable","type":"fallback"}] }

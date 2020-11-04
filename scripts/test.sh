@@ -7,4 +7,4 @@ testOSM() {
     # echo # empty line
 }
 
-testOSM
+#testOSM
