@@ -53,7 +53,8 @@ if [ -z "${PRICE_FEED}" ]; then
 fi
 
 if [ -z "${CHAINLINK}" ]; then
-    CHAINLINK=$(dapp create MockChainLink)
+    price=$(echo "(10^18)/150" | bc)
+    CHAINLINK=$(dapp create MockChainLink $price)
     verifyDeploy $CHAINLINK && export CHAINLINK=$CHAINLINK
 fi
 

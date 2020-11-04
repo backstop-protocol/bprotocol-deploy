@@ -102,21 +102,24 @@ async function processCdp(cdp, medianizerPrice) {
       { gas: 12.5e6 } // Higher gas limit needed to execute
     );
 
+    const vaultInfo = cdpInfo[0].vault;
     const cushionInfo = cdpInfo[0].cushion;
     const biteInfo = cdpInfo[0].bite;
 
-    if (cushionInfo.shouldProvideCushion) {
+    const priceFeedOk = vaultInfo.expectedEthReturnBetterThanChainlinkPrice;
+
+    if (cushionInfo.shouldProvideCushion && priceFeedOk) {
       await depositBeforeTopup(cdp, cushionInfo);
     }
 
-    if (cushionInfo.canCallTopupNow) {
+    if (cushionInfo.canCallTopupNow && priceFeedOk) {
       await processTopup(cdp, biteInfo);
     } else if (cushionInfo.shouldCallUntop) {
       await processUntop(cdp);
     }
 
     if (biteInfo.canCallBiteNow) {
-      await processBite(cdp, biteInfo);
+      await processBite(cdp, cushionInfo, biteInfo);
     }
   } catch (err) {
     console.log(err);
@@ -144,10 +147,12 @@ async function processUntop(cdp) {
   console.log("### UN-TOPPED ###: " + cdp);
 }
 
-async function processBite(cdp, bi) {
+async function processBite(cdp, ci, bi) {
   const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
 
-  await ensureDAIBalance(cdp, new BN(bi.availableBiteInDaiWei).mul(RAY), MEMBER_1);
+  const providedCushion = new BN(ci.cushionSizeInWei).div(new BN(ci.numLiquidators));
+  const daiNeeded = avail.sub(providedCushion);
+  await ensureDAIBalance(cdp, daiNeeded.mul(RAY), MEMBER_1);
 
   const eth2daiPrice = await getEth2DaiMarketPrice();
   const minEthReturn = new BN(bi.availableBiteInDaiWei).div(eth2daiPrice);
