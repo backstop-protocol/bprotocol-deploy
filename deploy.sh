@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-if [ -z $1 ]; then
-    echo "NETWORK NOT FOUND"
-    return 1
-fi
-
 # SETUP ENV VARIABLES
 . scripts/env.sh
 
@@ -32,7 +27,7 @@ fi
 #########################
 ##### BUILD PROJECT #####
 #########################
-dapp update
+# dapp update
 dapp --use solc:0.5.16 build
 
 
@@ -58,7 +53,8 @@ if [ -z "${PRICE_FEED}" ]; then
 fi
 
 if [ -z "${CHAINLINK}" ]; then
-    CHAINLINK=$(dapp create MockChainLink)
+    price=$(echo "(10^18)/150" | bc)
+    CHAINLINK=$(dapp create MockChainLink $price)
     verifyDeploy $CHAINLINK && export CHAINLINK=$CHAINLINK
 fi
 
@@ -160,11 +156,17 @@ if [ -z "${MIGRATE}" ]; then
     verifyDeploy $MIGRATE && export MIGRATE=$MIGRATE
 fi
 
-# Deploy FlatLiquidatorInfo
+# Deploy LiquidatorInfo
 # ctor args = manager_
-if [ -z "${FLATLIQUIDATOR_INFO}" ]; then
-    FLATLIQUIDATOR_INFO=$(dapp create FlatLiquidatorInfo $B_CDP_MANAGER $CHAINLINK)
-    verifyDeploy $FLATLIQUIDATOR_INFO && export FLATLIQUIDATOR_INFO=$FLATLIQUIDATOR_INFO
+if [ -z "${LIQUIDATOR_INFO}" ]; then
+    LIQUIDATOR_INFO=$(dapp create LiquidatorInfo $B_CDP_MANAGER $CHAINLINK)
+    verifyDeploy $LIQUIDATOR_INFO && export LIQUIDATOR_INFO=$LIQUIDATOR_INFO
+fi
+
+# Deploy LiquidatorBalanceInfo
+if [ -z "${LIQUIDATOR_BAL_INFO}" ]; then
+    LIQUIDATOR_BAL_INFO=$(dapp create LiquidatorBalanceInfo)
+    verifyDeploy $LIQUIDATOR_BAL_INFO && export LIQUIDATOR_BAL_INFO=$LIQUIDATOR_BAL_INFO
 fi
 
 
@@ -250,7 +252,8 @@ echo MEMBERS=$MEMBERS
 echo GOV_EXECUTOR=$GOV_EXECUTOR
 echo MIGRATE=$MIGRATE
 echo B_PROXY_ACTIONS=$B_PROXY_ACTIONS
-echo FLATLIQUIDATOR_INFO=$FLATLIQUIDATOR_INFO
+echo LIQUIDATOR_INFO=$LIQUIDATOR_INFO
+echo LIQUIDATOR_BAL_INFO=$LIQUIDATOR_BAL_INFO
 echo "##################################"
 
 # VALIDATE DEPLOYMENT

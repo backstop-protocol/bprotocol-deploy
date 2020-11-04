@@ -1,8 +1,10 @@
-const { BN } = require("@openzeppelin/test-helpers");
-const { RAY, RAD, ONE_ETH } = require("../../test-utils/constants");
+"use strict";
 
-const mcdJSON = require("../../config/mcd_testchain.json");
-const bpJSON = require("../../config/bprotocol_testchain.json");
+const { BN } = require("@openzeppelin/test-helpers");
+const { RAY, RAD, ONE_ETH, TEN_MINUTES } = require("../../test-utils/constants");
+
+const mcdJSON = require("../../config/mcdTestchain.json");
+const bpJSON = require("../../config/bprotocolTestchain.json");
 
 // MCD Contracts
 const DssCdpManager = artifacts.require("DssCdpManager");
@@ -17,6 +19,7 @@ const OSM = artifacts.require("OSM");
 const BCdpManager = artifacts.require("BCdpManager");
 const Pool = artifacts.require("Pool");
 const LiquidatorInfo = artifacts.require("LiquidatorInfo");
+const BudConnector = artifacts.require("BudConnector");
 
 // B.Protocol
 let bCdpManager;
@@ -28,11 +31,16 @@ let dssCdpManager;
 let gemJoin;
 let weth;
 let vat;
+let dai;
+let daiJoin;
+let osm;
+let medianizer;
 
 let MEMBER_1 = bpJSON.MEMBER_1;
 
 const ILK_ETH = web3.utils.padRight(web3.utils.asciiToHex("ETH-A"), 64);
 
+// cdp => pending (bool)
 const pending = new Map();
 
 module.exports = async function (callback) {
@@ -46,7 +54,7 @@ module.exports = async function (callback) {
     vat = await Vat.at(mcdJSON.MCD_VAT);
     osm = await OSM.at(mcdJSON.PIP_ETH);
     weth = await WETH9.at(await gemJoin.gem());
-    liqInfo = await LiquidatorInfo.at(bpJSON.FLATLIQUIDATOR_INFO);
+    liqInfo = await LiquidatorInfo.at(bpJSON.LIQUIDATOR_INFO);
 
     // initialize
     await init();
@@ -54,7 +62,7 @@ module.exports = async function (callback) {
     web3.eth.subscribe("newBlockHeaders", async (error, event) => {
       try {
         if (!error) {
-          console.log("Block: " + event.number);
+          console.log("Block: " + event.number + " Timestamp: " + event.timestamp);
           await processCdps();
         } else {
           console.log(error);
@@ -69,36 +77,69 @@ module.exports = async function (callback) {
 };
 
 async function processCdps() {
-  let maxCdp = await bCdpManager.cdpi();
-  for (let i = 1; i <= maxCdp; i++) {
-    const isPending = pending.get(i);
-    if (!isPending) {
-      await processCdp(i);
+  const maxCdp = await bCdpManager.cdpi();
+  const medianizerPrice = await getMedianizerPrice();
+  for (let cdp = 1; cdp <= maxCdp; cdp++) {
+    if (!pending.get(cdp)) {
+      pending.set(cdp, true);
+      try {
+        await processCdp(cdp, medianizerPrice);
+      } catch (err) {
+        console.log(err);
+      }
+      pending.set(cdp, false);
     }
   }
 }
 
-async function processCdp(cdp) {
-  pending.set(cdp, true);
+async function processCdp(cdp, medianizerPrice) {
+  try {
+    const cdpInfo = await liqInfo.getCdpData.call(
+      cdp,
+      cdp,
+      MEMBER_1,
+      medianizerPrice,
+      { gas: 12.5e6 } // Higher gas limit needed to execute
+    );
 
-  let cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
+    const vaultInfo = cdpInfo[0].vault;
+    const cushionInfo = cdpInfo[0].cushion;
+    const biteInfo = cdpInfo[0].bite;
 
-  if (!cushionInfo.isToppedUp && cushionInfo.canCallTopupNow) {
-    await processTopup(cdp);
-  } else if (cushionInfo.isToppedUp && cushionInfo.shouldCallUntop) {
-    await processUntop(cdp);
+    const priceFeedOk = vaultInfo.expectedEthReturnBetterThanChainlinkPrice;
+
+    if (cushionInfo.shouldProvideCushion && priceFeedOk) {
+      await depositBeforeTopup(cdp, cushionInfo);
+    }
+
+    if (cushionInfo.canCallTopupNow && priceFeedOk) {
+      await processTopup(cdp, biteInfo);
+    } else if (cushionInfo.shouldCallUntop) {
+      await processUntop(cdp);
+    }
+
+    if (biteInfo.canCallBiteNow) {
+      await processBite(cdp, cushionInfo, biteInfo);
+    }
+  } catch (err) {
+    console.log(err);
   }
-
-  // Read latest biteInfo just before bite call
-  const biteInfo = await liqInfo.getBiteInfo(cdp, MEMBER_1);
-  if (biteInfo.canCallBiteNow) await processBite(cdp);
-
-  pending.set(cdp, false);
 }
 
-async function processTopup(cdp) {
-  await pool.topup(cdp, { from: MEMBER_1 });
-  console.log("### TOPPED-UP ###: " + cdp);
+async function depositBeforeTopup(cdp, ci) {
+  const timeToReachTopup = new BN(ci.minimumTimeBeforeCallingTopup);
+  // console.log("TimeToReachTopup: " + timeToReachTopup.toString());
+  if (timeToReachTopup.lt(TEN_MINUTES)) {
+    await ensureDAIBalance(cdp, new BN(ci.cushionSizeInWei).mul(RAY), MEMBER_1);
+  }
+}
+
+async function processTopup(cdp, bi) {
+  const timeToReachBite = new BN(bi.minimumTimeBeforeCallingBite);
+  if (timeToReachBite.lt(TEN_MINUTES)) {
+    await pool.topup(cdp, { from: MEMBER_1 });
+    console.log("### TOPPED-UP ###: " + cdp);
+  }
 }
 
 async function processUntop(cdp) {
@@ -106,11 +147,18 @@ async function processUntop(cdp) {
   console.log("### UN-TOPPED ###: " + cdp);
 }
 
-async function processBite(cdp) {
+async function processBite(cdp, ci, bi) {
   const avail = await pool.availBite.call(cdp, MEMBER_1, { from: MEMBER_1 });
 
+  const providedCushion = new BN(ci.cushionSizeInWei).div(new BN(ci.numLiquidators));
+  const daiNeeded = avail.sub(providedCushion);
+  await ensureDAIBalance(cdp, daiNeeded.mul(RAY), MEMBER_1);
+
+  const eth2daiPrice = await getEth2DaiMarketPrice();
+  const minEthReturn = new BN(bi.availableBiteInDaiWei).div(eth2daiPrice);
+
   // bite
-  await pool.bite(cdp, avail, 1, { from: MEMBER_1 });
+  await pool.bite(cdp, avail, minEthReturn, { from: MEMBER_1 });
   console.log("### BITTEN ###: " + cdp);
 
   // exit
@@ -123,21 +171,65 @@ async function processBite(cdp) {
   console.log("### WITHDRAWN ###: " + radToDAI(rad) + " DAI");
 }
 
+async function getEth2DaiMarketPrice() {
+  // NOTICE: This ETH to DAI rate should be taken from real market. eg. Binance order-book etc.
+  const eth2daiMarketPrice = new BN(145);
+  // NOTICE: You can get the real market rate here and return from this function.
+  return eth2daiMarketPrice;
+}
+
+async function getMedianizerPrice() {
+  const val = await medianizer.read(ILK_ETH, { from: bpJSON.B_CDP_MANAGER });
+  return web3.utils.hexToNumberString(val);
+}
+
+// Ensure that the MEMBER has expected DAI balance before topup
+async function ensureDAIBalance(cdp, neededRadBal, _from) {
+  try {
+    if (neededRadBal.eq(new BN(0))) return;
+
+    // Add 1 DAI to avoid rounding errors
+    neededRadBal = neededRadBal.add(RAD);
+    const radInVat = await vat.dai(_from);
+    const radInPool = await pool.rad(_from);
+    const radMemberHave = radInPool.add(radInVat);
+    if (radMemberHave.lt(neededRadBal)) {
+      // mint more DAI
+      const radNeedsMore = neededRadBal.sub(radMemberHave);
+      await dssCdpManager.frob(cdp, 0, radNeedsMore, { from: _from });
+      console.log("MINTED " + radToDAI(radNeedsMore) + " DAI");
+    }
+
+    if (radInPool.lt(neededRadBal)) {
+      // radNeedsMore = neededRadBal - radInPool + 1e18
+      const radNeedsMore = neededRadBal.sub(radInPool);
+      await pool.deposit(radNeedsMore, { from: _from });
+      console.log("Member:" + _from + " deposited: " + radToDAI(radNeedsMore) + " DAI");
+    }
+  } catch (err) {
+    console.log(err);
+  }
+}
+
 async function init() {
-  await mintDaiForMember(20, 1000, { from: MEMBER_1 });
+  const real = await bCdpManager.real();
+  medianizer = await BudConnector.at(real);
+
+  await mintDaiForMember(20, 1000, MEMBER_1);
 
   await vat.hope(pool.address, { from: MEMBER_1 });
-  const radVal = new BN(1000).mul(ONE_ETH).mul(RAY);
-  await pool.deposit(radVal, { from: MEMBER_1 });
-  console.log("Member:" + MEMBER_1 + " deposited: " + radToDAI(radVal) + " DAI");
+
+  // deposit 1 DAI
+  const depositRad = ONE_ETH.mul(RAY);
+  await pool.deposit(depositRad, { from: MEMBER_1 });
+  console.log("Member:" + MEMBER_1 + " deposited: " + radToDAI(depositRad) + " DAI");
 }
 
 function radToDAI(radVal) {
   return radVal.div(RAD).toString();
 }
 
-async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
-  const _from = opt.from;
+async function mintDai(manager, amtInEth, amtInDai, isMove, _from) {
   const ink = new BN(amtInEth).mul(new BN(ONE_ETH));
   const art = new BN(amtInDai).mul(new BN(ONE_ETH));
 
@@ -172,8 +264,7 @@ async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
   }
 }
 
-async function mintDaiForMember(amtInEth, amtInDai, opt) {
-  const _from = opt.from;
-  await mintDai(dssCdpManager, amtInEth, amtInDai, true, opt);
-  console.log("Minted: " + amtInDai + " DAI for MEMBER:" + opt.from);
+async function mintDaiForMember(amtInEth, amtInDai, _from) {
+  await mintDai(dssCdpManager, amtInEth, amtInDai, true, _from);
+  console.log("Minted: " + amtInDai + " DAI for MEMBER:" + _from);
 }
