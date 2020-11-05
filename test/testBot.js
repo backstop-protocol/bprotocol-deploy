@@ -8,7 +8,7 @@ const {
   uintToBytes32,
   increaseOneHour,
 } = require("../test-utils/utils");
-const { WAD, RAY, ONE_ETH, ONE_HOUR } = require("../test-utils/constants");
+const { WAD, RAY, ONE_ETH, ONE_HOUR, RAD } = require("../test-utils/constants");
 
 const mcdJSON = require("../config/mcdTestchain.json");
 const bpJSON = require("../config/bprotocolTestchain.json");
@@ -27,6 +27,7 @@ const MockDaiToUsdPriceFeed = artifacts.require("MockDaiToUsdPriceFeed");
 const MockChainlink = artifacts.require("MockChainlink");
 
 // MCD
+const DssCdpManager = artifacts.require("DssCdpManager");
 const WETH = artifacts.require("WETH");
 const GemJoin = artifacts.require("GemJoin");
 const OSM = artifacts.require("OSM");
@@ -48,6 +49,7 @@ let dai2usd;
 let chainlink;
 
 // MCD
+let dssCdpManager;
 let weth;
 let gemJoin;
 let osm;
@@ -58,9 +60,11 @@ let vat;
 let jug;
 
 let USER_1 = "0xda1495ebd7573d8e7f860862baa3abecebfa02e0";
-let USER_2 = "0xb76a5a26ba0041eca3edc28a992e4eb65a3b3d05";
+let WHALE = "0xb76a5a26ba0041eca3edc28a992e4eb65a3b3d05";
 
 let MEMBER_1 = bpJSON.MEMBER_1;
+
+let cdpWhale;
 
 contract("Testchain", (accounts) => {
   before(async () => {
@@ -70,6 +74,7 @@ contract("Testchain", (accounts) => {
     bud = await BudConnector.at(bpJSON.BUD_CONN_ETH);
 
     // MCD
+    dssCdpManager = await DssCdpManager.at(mcdJSON.CDP_MANAGER);
     gemJoin = await GemJoin.at(mcdJSON.MCD_JOIN_ETH_A);
     const gem = await gemJoin.gem();
     weth = await WETH.at(gem);
@@ -87,12 +92,21 @@ contract("Testchain", (accounts) => {
     chainlink = await MockChainlink.at(bpJSON.CHAINLINK);
 
     await setMCD();
+    await mintDaiForWhale();
   });
 
   beforeEach(async () => {
     await resetPrice();
   });
 
+  afterEach(async () => {
+    const maxCdp = await bCdpManager.cdpi();
+    for (let cdp = 1; cdp <= maxCdp; cdp++) {
+      await repayAll(cdp, USER_1);
+    }
+  });
+
+  /*
   it("Test Bite", async () => {
     let ci;
     let bi;
@@ -149,13 +163,15 @@ contract("Testchain", (accounts) => {
     await increaseTime_MineBlock_Sleep(1, 10);
 
     // NOTICE: It should be bitten at Bot
+    
   });
 
+  
   it("Test untop", async () => {
     let ci;
     let bi;
 
-    const cdp = await mintDaiForUser(2, 199, { from: USER_2 });
+    const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
     console.log("New CDP: " + cdp + " opened");
 
     // setNextPrice
@@ -198,7 +214,7 @@ contract("Testchain", (accounts) => {
 
     // Repay 90 DAI
     const repayDAI = new BN(90).mul(ONE_ETH).mul(new BN(-1));
-    await bCdpManager.frob(cdp, 0, repayDAI, { from: USER_2 });
+    await bCdpManager.frob(cdp, 0, repayDAI, { from: USER_1 });
 
     console.log("52 mins passed. User repayed. Member should untop");
     await increaseTime_MineBlock_Sleep(1, 10);
@@ -206,11 +222,12 @@ contract("Testchain", (accounts) => {
     // NOTICE: It should be untopped at Bot
   });
 
+  
   it("Test chainlink low price", async () => {
     let ci;
     let bi;
 
-    const cdp = await mintDaiForUser(2, 199, { from: USER_2 });
+    const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
     console.log("New CDP: " + cdp + " opened");
 
     // setNextPrice
@@ -234,12 +251,77 @@ contract("Testchain", (accounts) => {
     // set chainlink price
     await setChainlinkPrice(new BN(110));
 
-    // member deposit, 10 mins before topup allowed
     console.log("20 mins passed, No deposit should happen, as chainline price is better");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
+
+    console.log("40 mins passed. Nothing should happen.");
+    await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
+    console.log("50 mins passed. Nothing should happen.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+  });
+*/
+  it("Test chainlink with high price", async () => {
+    let ci;
+    let bi;
+
+    const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
+    console.log("New CDP: " + cdp + " opened");
+
+    const urn = await bCdpManager.urns(cdp);
+    let result = await vat.urns(ILK_ETH, urn);
+    console.log(urn);
+    console.log(await bCdpManager.owns(cdp));
+    console.log(result.art.toString());
+
+    // setNextPrice
+    await setNextPrice(new BN(145).mul(ONE_ETH));
+    await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+    await setChainlinkPrice(new BN(145));
+
+    result = await vat.urns(ILK_ETH, urn);
+    console.log(result.art.toString());
+
+    await syncOSMTime();
+    await osm.poke();
+    await spot.poke(ILK_ETH);
+    console.log("## Current price: " + (await getCurrentPrice()).toString());
+    console.log("## Next price: " + (await getNextPrice()).toString());
+
+    result = await vat.urns(ILK_ETH, urn);
+    console.log(result.art.toString());
+
+    // nothing should happen
+    console.log("10 mins passed. Nothing should happen for cdp.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
+    result = await vat.urns(ILK_ETH, urn);
+    console.log(result.art.toString());
+
+    // set chainlink price
+    await setChainlinkPrice(new BN(200));
+
+    // member deposit, 10 mins before topup allowed
+    console.log("20 mins passed, deposit should happen, as chainline price is not better");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
+    result = await vat.urns(ILK_ETH, urn);
+    console.log(result.art.toString());
 
     // nothing should happen
     console.log("40 mins passed. Nothing should happen.");
@@ -248,14 +330,88 @@ contract("Testchain", (accounts) => {
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
 
-    // member should topup, 10 mins before bite allowed
-    console.log("50 mins passed. Nothing should happen.");
+    result = await vat.urns(ILK_ETH, urn);
+    console.log(result.art.toString());
+
+    console.log("50 mins passed. Member should topup.");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(true).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+  });
+  /*
+  it("Test expectedEth is greater than collateral", async () => {
+    let ci;
+    let bi;
+
+    const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
+    console.log("New CDP: " + cdp + " opened");
+
+    // setNextPrice
+    await setNextPrice(new BN(145).mul(ONE_ETH));
+    await real.poke(uintToBytes32(new BN(100).mul(ONE_ETH)));
+    await setChainlinkPrice(new BN(145));
+
+    await syncOSMTime();
+    await osm.poke();
+    await spot.poke(ILK_ETH);
+    console.log("## Current price: " + (await getCurrentPrice()).toString());
+    console.log("## Next price: " + (await getNextPrice()).toString());
+
+    // nothing should happen
+    console.log("10 mins passed. Nothing should happen for cdp.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
+
+    console.log(
+      "20 mins passed. No deposit should happen as expectedEth is greater than collateral."
+    );
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+
+    // nothing should happen
+    console.log("40 mins passed. Nothing should happen for cdp.");
+    await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+
+    console.log("50 mins passed. Member should not topup.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+
+    await increaseTime_MineBlock_Sleep(5, 5); // ==> 45 mins passed
+    expect(false).to.be.equal(ci.isToppedUp);
   });
+  */
 });
+
+async function mintDaiForWhale() {
+  cdpWhale = await mintDaiFromMaker(10, 200, { from: WHALE });
+}
+
+async function transferDaiFromWhale(rad, to) {
+  await dssCdpManager.move(cdpWhale, to, rad, { from: WHALE });
+}
+
+async function repayAll(cdp, _from) {
+  const urn = await bCdpManager.urns(cdp);
+  console.log(urn);
+  console.log(await bCdpManager.owns(cdp));
+  let result = await vat.urns(ILK_ETH, urn);
+  if (result.art.gt(new BN(0))) {
+    console.log("Repaying all debt for cdp: " + cdp);
+    console.log(result.art.toString());
+
+    await transferDaiFromWhale(ONE_ETH.mul(RAY), urn);
+    result = await vat.urns(ILK_ETH, urn);
+    console.log(result.art.toString());
+    console.log("dai" + (await vat.dai(urn)).toString());
+    await bCdpManager.frob(cdp, 0, result.art.mul(new BN(-1)), { from: _from });
+
+    result = await vat.urns(ILK_ETH, urn);
+    console.log(result.art.toString());
+  }
+}
 
 async function setChainlinkPrice(newPrice) {
   console.log("Setting Chainlink price to " + newPrice.toString());
@@ -267,6 +423,7 @@ async function setMCD() {
 
   let ilk = await vat.ilks(ILK_ETH);
   console.log("Vat.ilks('ETH-A').rate: " + ilk.rate.toString());
+  console.log("Vat.ilks('ETH-A').dust: " + ilk.dust.toString());
 
   ilk = await cat.ilks(ILK_ETH);
   console.log("Cat.ilks('ETH-A').chop: " + ilk.chop.toString());
@@ -336,6 +493,12 @@ async function resetPrice() {
 async function mintDaiForUser(amtInEth, amtInDai, opt) {
   const cdp = await mintDai(bCdpManager, amtInEth, amtInDai, false, opt);
   console.log("Minted: " + amtInDai + " DAI for USER:" + opt.from);
+  return cdp;
+}
+
+async function mintDaiFromMaker(amtInEth, amtInDai, opt) {
+  const cdp = await mintDai(dssCdpManager, amtInEth, amtInDai, false, opt);
+  console.log("Minted: " + amtInDai + " DAI for WHALE:" + opt.from);
   return cdp;
 }
 
