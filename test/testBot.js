@@ -106,7 +106,6 @@ contract("Testchain", (accounts) => {
     }
   });
 
-  /*
   it("Test Bite", async () => {
     let ci;
     let bi;
@@ -163,10 +162,8 @@ contract("Testchain", (accounts) => {
     await increaseTime_MineBlock_Sleep(1, 10);
 
     // NOTICE: It should be bitten at Bot
-    
   });
 
-  
   it("Test untop", async () => {
     let ci;
     let bi;
@@ -222,7 +219,6 @@ contract("Testchain", (accounts) => {
     // NOTICE: It should be untopped at Bot
   });
 
-  
   it("Test chainlink low price", async () => {
     let ci;
     let bi;
@@ -269,7 +265,7 @@ contract("Testchain", (accounts) => {
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
   });
-*/
+
   it("Test chainlink with high price", async () => {
     let ci;
     let bi;
@@ -277,19 +273,10 @@ contract("Testchain", (accounts) => {
     const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
     console.log("New CDP: " + cdp + " opened");
 
-    const urn = await bCdpManager.urns(cdp);
-    let result = await vat.urns(ILK_ETH, urn);
-    console.log(urn);
-    console.log(await bCdpManager.owns(cdp));
-    console.log(result.art.toString());
-
     // setNextPrice
     await setNextPrice(new BN(145).mul(ONE_ETH));
     await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
     await setChainlinkPrice(new BN(145));
-
-    result = await vat.urns(ILK_ETH, urn);
-    console.log(result.art.toString());
 
     await syncOSMTime();
     await osm.poke();
@@ -297,18 +284,12 @@ contract("Testchain", (accounts) => {
     console.log("## Current price: " + (await getCurrentPrice()).toString());
     console.log("## Next price: " + (await getNextPrice()).toString());
 
-    result = await vat.urns(ILK_ETH, urn);
-    console.log(result.art.toString());
-
     // nothing should happen
     console.log("10 mins passed. Nothing should happen for cdp.");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
-
-    result = await vat.urns(ILK_ETH, urn);
-    console.log(result.art.toString());
 
     // set chainlink price
     await setChainlinkPrice(new BN(200));
@@ -320,9 +301,6 @@ contract("Testchain", (accounts) => {
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
 
-    result = await vat.urns(ILK_ETH, urn);
-    console.log(result.art.toString());
-
     // nothing should happen
     console.log("40 mins passed. Nothing should happen.");
     await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
@@ -330,16 +308,13 @@ contract("Testchain", (accounts) => {
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
 
-    result = await vat.urns(ILK_ETH, urn);
-    console.log(result.art.toString());
-
     console.log("50 mins passed. Member should topup.");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(true).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
   });
-  /*
+
   it("Test expectedEth is greater than collateral", async () => {
     let ci;
     let bi;
@@ -382,7 +357,6 @@ contract("Testchain", (accounts) => {
     await increaseTime_MineBlock_Sleep(5, 5); // ==> 45 mins passed
     expect(false).to.be.equal(ci.isToppedUp);
   });
-  */
 });
 
 async function mintDaiForWhale() {
@@ -395,21 +369,21 @@ async function transferDaiFromWhale(rad, to) {
 
 async function repayAll(cdp, _from) {
   const urn = await bCdpManager.urns(cdp);
-  console.log(urn);
-  console.log(await bCdpManager.owns(cdp));
+
   let result = await vat.urns(ILK_ETH, urn);
   if (result.art.gt(new BN(0))) {
     console.log("Repaying all debt for cdp: " + cdp);
-    console.log(result.art.toString());
 
+    // To cover yearly interest
     await transferDaiFromWhale(ONE_ETH.mul(RAY), urn);
-    result = await vat.urns(ILK_ETH, urn);
-    console.log(result.art.toString());
-    console.log("dai" + (await vat.dai(urn)).toString());
-    await bCdpManager.frob(cdp, 0, result.art.mul(new BN(-1)), { from: _from });
 
+    // Trigger untop if a test ends with topup
+    await bCdpManager.frob(cdp, 0, 0, { from: _from });
+
+    // Read latest art again
     result = await vat.urns(ILK_ETH, urn);
-    console.log(result.art.toString());
+
+    await bCdpManager.frob(cdp, 0, result.art.mul(new BN(-1)), { from: _from });
   }
 }
 
