@@ -58,6 +58,7 @@ let real;
 let cat;
 let vat;
 let jug;
+let medianizer;
 
 let USER_1 = "0xda1495ebd7573d8e7f860862baa3abecebfa02e0";
 let WHALE = "0xb76a5a26ba0041eca3edc28a992e4eb65a3b3d05";
@@ -84,6 +85,7 @@ contract("Testchain", (accounts) => {
     cat = await Cat.at(mcdJSON.MCD_CAT);
     vat = await Vat.at(mcdJSON.MCD_VAT);
     jug = await Jug.at(mcdJSON.MCD_JUG);
+    medianizer = await BudConnector.at(await bCdpManager.real());
 
     // dYdX
     dai2usd = await MockDaiToUsdPriceFeed.at(bpJSON.DAI2USD);
@@ -318,6 +320,7 @@ contract("Testchain", (accounts) => {
   it("Test expectedEth is greater than collateral", async () => {
     let ci;
     let bi;
+    let vi;
 
     const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
     console.log("New CDP: " + cdp + " opened");
@@ -336,26 +339,55 @@ contract("Testchain", (accounts) => {
     // nothing should happen
     console.log("10 mins passed. Nothing should happen for cdp.");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
+    [ci, bi, vi] = await getLiquidatorInfo(cdp);
     expect(false).to.be.equal(ci.isToppedUp);
     expect(false).to.be.equal(bi.canCallBiteNow);
+    let isExpectedEthGreaterThanCollateral = new BN(vi.expectedEthReturnWithCurrentPrice).gt(
+      new BN(vi.collateralInWei)
+    );
+    expect(true).to.be.equal(isExpectedEthGreaterThanCollateral);
 
     console.log(
       "20 mins passed. No deposit should happen as expectedEth is greater than collateral."
     );
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+    [ci, bi, vi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    isExpectedEthGreaterThanCollateral = new BN(vi.expectedEthReturnWithCurrentPrice).gt(
+      new BN(vi.collateralInWei)
+    );
+    expect(true).to.be.equal(isExpectedEthGreaterThanCollateral);
 
     // nothing should happen
     console.log("40 mins passed. Nothing should happen for cdp.");
     await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+    [ci, bi, vi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    isExpectedEthGreaterThanCollateral = new BN(vi.expectedEthReturnWithCurrentPrice).gt(
+      new BN(vi.collateralInWei)
+    );
+    expect(true).to.be.equal(isExpectedEthGreaterThanCollateral);
 
     console.log("50 mins passed. Member should not topup.");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
+    [ci, bi, vi] = await getLiquidatorInfo(cdp);
     expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    isExpectedEthGreaterThanCollateral = new BN(vi.expectedEthReturnWithCurrentPrice).gt(
+      new BN(vi.collateralInWei)
+    );
+    expect(true).to.be.equal(isExpectedEthGreaterThanCollateral);
 
     await increaseTime_MineBlock_Sleep(5, 5); // ==> 45 mins passed
+    [ci, bi, vi] = await getLiquidatorInfo(cdp);
     expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    isExpectedEthGreaterThanCollateral = new BN(vi.expectedEthReturnWithCurrentPrice).gt(
+      new BN(vi.collateralInWei)
+    );
+    expect(true).to.be.equal(isExpectedEthGreaterThanCollateral);
   });
 });
 
@@ -407,9 +439,13 @@ async function setMCD() {
 }
 
 async function getLiquidatorInfo(cdp) {
+  const val = await medianizer.read(ILK_ETH, { from: bpJSON.B_CDP_MANAGER });
+  const medianizerPrice = web3.utils.hexToNumberString(val);
+
+  const vaultInfo = await liqInfo.getVaultInfo.call(cdp, medianizerPrice);
   const cushionInfo = await liqInfo.getCushionInfo(cdp, MEMBER_1, 4);
   const biteInfo = await liqInfo.getBiteInfo(cdp, MEMBER_1);
-  return [cushionInfo, biteInfo];
+  return [cushionInfo, biteInfo, vaultInfo];
 }
 
 async function setPermissions() {
