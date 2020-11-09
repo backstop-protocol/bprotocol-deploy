@@ -106,13 +106,19 @@ async function processCdp(cdp, medianizerPrice) {
     const cushionInfo = cdpInfo[0].cushion;
     const biteInfo = cdpInfo[0].bite;
 
+    // isExpectedEthLessThanCollateral = expectedEth > Cdp-Collateral
+    const expectedEth = new BN(vaultInfo.expectedEthReturnWithCurrentPrice);
+    const isExpectedEthLessThanCollateral = expectedEth.lt(new BN(vaultInfo.collateralInWei));
+
     const priceFeedOk = vaultInfo.expectedEthReturnBetterThanChainlinkPrice;
 
-    if (cushionInfo.shouldProvideCushion && priceFeedOk) {
+    const shouldDepositOrTopup = priceFeedOk && isExpectedEthLessThanCollateral;
+
+    if (cushionInfo.shouldProvideCushion && shouldDepositOrTopup) {
       await depositBeforeTopup(cdp, cushionInfo);
     }
 
-    if (cushionInfo.canCallTopupNow && priceFeedOk) {
+    if (cushionInfo.canCallTopupNow && shouldDepositOrTopup) {
       await processTopup(cdp, biteInfo);
     } else if (cushionInfo.shouldCallUntop) {
       await processUntop(cdp);
@@ -180,7 +186,7 @@ async function getEth2DaiMarketPrice() {
 
 async function getMedianizerPrice() {
   const val = await medianizer.read(ILK_ETH, { from: bpJSON.B_CDP_MANAGER });
-  return web3.utils.hexToNumberString(val);
+  return new BN(web3.utils.hexToNumberString(val));
 }
 
 // Ensure that the MEMBER has expected DAI balance before topup
