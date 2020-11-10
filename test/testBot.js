@@ -222,6 +222,27 @@ contract("Testchain", (accounts) => {
 
     // It should be bitten at Bot
     expect(true).to.be.equal(await bCdpManager.bitten(cdp));
+
+    console.log("70 mins passed, should have bitten = true");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 70 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    expect(true).to.be.equal(await bCdpManager.bitten(cdp));
+
+    console.log("120 mins passed, should have bitten = false");
+    await increaseTime_MineBlock_Sleep(50, 5); // ==> 120 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    expect(false).to.be.equal(await bCdpManager.bitten(cdp)); // 1 hour passed
+
+    console.log("180 mins passed, should have bitten = false and no topup");
+    await increaseTime_MineBlock_Sleep(60, 5); // ==> 180 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    expect(false).to.be.equal(await bCdpManager.bitten(cdp));
   });
 
   it("Test untop", async () => {
