@@ -1,7 +1,7 @@
 "use strict";
 
 const { BN } = require("@openzeppelin/test-helpers");
-const { RAY, RAD, ONE_ETH, TEN_MINUTES } = require("../../test-utils/constants");
+const { RAY, RAD, ONE_ETH, DUST, TEN_MINUTES } = require("../../test-utils/constants");
 
 const mcdJSON = require("../../config/mcdTestchain.json");
 const bpJSON = require("../../config/bprotocolTestchain.json");
@@ -114,11 +114,16 @@ async function processCdp(cdp, medianizerPrice) {
 
     const shouldDepositOrTopup = priceFeedOk && isExpectedEthLessThanCollateral;
 
-    if (cushionInfo.shouldProvideCushion && shouldDepositOrTopup) {
+    // (debtInDaiWei - cushionSizeInWei) > DUST
+    const notDust = new BN(vaultInfo.debtInDaiWei)
+      .sub(new BN(cushionInfo.cushionSizeInWei))
+      .gt(DUST);
+
+    if (cushionInfo.shouldProvideCushion && shouldDepositOrTopup && notDust) {
       await depositBeforeTopup(cdp, cushionInfo);
     }
 
-    if (cushionInfo.canCallTopupNow && shouldDepositOrTopup) {
+    if (cushionInfo.canCallTopupNow && shouldDepositOrTopup && notDust) {
       await processTopup(cdp, biteInfo);
     } else if (cushionInfo.shouldCallUntop) {
       await processUntop(cdp);

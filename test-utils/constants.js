@@ -17,6 +17,8 @@ const ONE_MINUTE = new BN(60);
 const TEN_MINUTES = new BN(10).mul(ONE_MINUTE);
 const ONE_HOUR = new BN(60).mul(ONE_MINUTE);
 
+const DUST = HUNDRED_DAI.add(ONE_ETH); // 101
+
 module.exports = {
   WAD,
   RAY,
@@ -27,4 +29,5 @@ module.exports = {
   ONE_MINUTE,
   TEN_MINUTES,
   ONE_HOUR,
+  DUST,
 };

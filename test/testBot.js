@@ -8,7 +8,7 @@ const {
   uintToBytes32,
   increaseOneHour,
 } = require("../test-utils/utils");
-const { WAD, RAY, ONE_ETH, ONE_HOUR, RAD } = require("../test-utils/constants");
+const { WAD, RAY, ONE_ETH, ONE_HOUR, RAD, HUNDRED_DAI } = require("../test-utils/constants");
 
 const mcdJSON = require("../config/mcdTestchain.json");
 const bpJSON = require("../config/bprotocolTestchain.json");
@@ -108,6 +108,56 @@ contract("Testchain", (accounts) => {
     }
   });
 
+  it("Test Dust", async () => {
+    let ci;
+    let bi;
+
+    // Mint
+    const ink = ONE_ETH.add(ONE_ETH.div(new BN(50))); // 1.02 ETH
+    const art = HUNDRED_DAI.add(ONE_ETH); // 101 DAI
+    const cdp = await mintDaiCustom(bCdpManager, ink, art, false, { from: USER_1 });
+    console.log("New CDP: " + cdp + " opened");
+
+    // setNextPrice
+    await setNextPrice(new BN(145).mul(ONE_ETH));
+    await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+    await setChainlinkPrice(new BN(145));
+
+    await syncOSMTime();
+    await osm.poke();
+    await spot.poke(ILK_ETH);
+    console.log("## Current price: " + (await getCurrentPrice()).toString());
+    console.log("## Next price: " + (await getNextPrice()).toString());
+
+    // nothing should happen
+    console.log("10 mins passed. Nothing should happen for cdp.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
+    // 10 mins before topup allowed
+    console.log("20 mins passed. No deposit, as amount is very less.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
+    // nothing should happen
+    console.log("40 mins passed. Nothing should happen for cdp.");
+    await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+
+    // 10 mins before bite allowed
+    console.log("50 mins passed. No bite should happen.");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+  });
+
   it("Test Bite", async () => {
     let ci;
     let bi;
@@ -139,16 +189,23 @@ contract("Testchain", (accounts) => {
       "20 mins passed. Member should deposit now (which is 10 mins before topup allowed)."
     );
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
 
     // nothing should happen
     console.log("40 mins passed. Nothing should happen for cdp.");
     await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
 
     // member should topup, 10 mins before bite allowed
     console.log("50 mins passed. Member should topup now (which is 10 mins before bite allowed).");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(true).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
 
     // member should be allowed to bite
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 60 mins passed
@@ -163,7 +220,29 @@ contract("Testchain", (accounts) => {
 
     await increaseTime_MineBlock_Sleep(1, 10);
 
-    // NOTICE: It should be bitten at Bot
+    // It should be bitten at Bot
+    expect(true).to.be.equal(await bCdpManager.bitten(cdp));
+
+    console.log("70 mins passed, should have bitten = true");
+    await increaseTime_MineBlock_Sleep(10, 5); // ==> 70 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    expect(true).to.be.equal(await bCdpManager.bitten(cdp));
+
+    console.log("120 mins passed, should have bitten = false");
+    await increaseTime_MineBlock_Sleep(50, 5); // ==> 120 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    expect(false).to.be.equal(await bCdpManager.bitten(cdp)); // 1 hour passed
+
+    console.log("180 mins passed, should have bitten = false and no topup");
+    await increaseTime_MineBlock_Sleep(60, 5); // ==> 180 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
+    expect(false).to.be.equal(await bCdpManager.bitten(cdp));
   });
 
   it("Test untop", async () => {
@@ -196,16 +275,23 @@ contract("Testchain", (accounts) => {
       "20 mins passed. Member should deposit now (which is 10 mins before topup allowed)."
     );
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
 
     // nothing should happen
     console.log("40 mins passed. Nothing should happen for cdp.");
     await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
 
     // member should topup, 10 mins before bite allowed
     console.log("50 mins passed. Member should topup now (which is 10 mins before bite allowed).");
     await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
     [ci, bi] = await getLiquidatorInfo(cdp);
     expect(true).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
 
     // NOTICE: It should be topped up at Bot
 
@@ -219,6 +305,9 @@ contract("Testchain", (accounts) => {
     await increaseTime_MineBlock_Sleep(1, 10);
 
     // NOTICE: It should be untopped at Bot
+    [ci, bi] = await getLiquidatorInfo(cdp);
+    expect(false).to.be.equal(ci.isToppedUp);
+    expect(false).to.be.equal(bi.canCallBiteNow);
   });
 
   it("Test chainlink low price", async () => {
@@ -513,9 +602,14 @@ async function mintDaiFromMaker(amtInEth, amtInDai, opt) {
 }
 
 async function mintDai(manager, amtInEth, amtInDai, isMove, opt) {
-  const _from = opt.from;
   const ink = new BN(amtInEth).mul(new BN(ONE_ETH));
   const art = new BN(amtInDai).mul(new BN(ONE_ETH));
+  const cdp = mintDaiCustom(manager, ink, art, isMove, opt);
+  return cdp;
+}
+
+async function mintDaiCustom(manager, ink, art, isMove, opt) {
+  const _from = opt.from;
   let cdp;
   try {
     // manager.open();
