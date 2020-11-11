@@ -159,9 +159,7 @@ contract("Testchain", (accounts) => {
   });
 
   it("Test Bite", async () => {
-    let ci;
-    let bi;
-    const cdp = await testSingleBite();
+    await testSingleBite();
   });
 
   it("Test untop", async () => {
