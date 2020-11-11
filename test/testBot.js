@@ -159,90 +159,7 @@ contract("Testchain", (accounts) => {
   });
 
   it("Test Bite", async () => {
-    let ci;
-    let bi;
-
-    // Mint
-    const cdp = await mintDaiForUser(2, 199, { from: USER_1 });
-    console.log("New CDP: " + cdp + " opened");
-
-    // setNextPrice
-    await setNextPrice(new BN(145).mul(ONE_ETH));
-    await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
-    await setChainlinkPrice(new BN(145));
-
-    await syncOSMTime();
-    await osm.poke();
-    await spot.poke(ILK_ETH);
-    console.log("## Current price: " + (await getCurrentPrice()).toString());
-    console.log("## Next price: " + (await getNextPrice()).toString());
-
-    // nothing should happen
-    console.log("10 mins passed. Nothing should happen for cdp.");
-    await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
-    expect(false).to.be.equal(ci.isToppedUp);
-    expect(false).to.be.equal(bi.canCallBiteNow);
-
-    // member deposit, 10 mins before topup allowed
-    console.log(
-      "20 mins passed. Member should deposit now (which is 10 mins before topup allowed)."
-    );
-    await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
-    expect(false).to.be.equal(ci.isToppedUp);
-    expect(false).to.be.equal(bi.canCallBiteNow);
-
-    // nothing should happen
-    console.log("40 mins passed. Nothing should happen for cdp.");
-    await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
-    expect(false).to.be.equal(ci.isToppedUp);
-    expect(false).to.be.equal(bi.canCallBiteNow);
-
-    // member should topup, 10 mins before bite allowed
-    console.log("50 mins passed. Member should topup now (which is 10 mins before bite allowed).");
-    await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
-    expect(true).to.be.equal(ci.isToppedUp);
-    expect(false).to.be.equal(bi.canCallBiteNow);
-
-    // member should be allowed to bite
-    await increaseTime_MineBlock_Sleep(10, 5); // ==> 60 mins passed
-
-    // After 1 hour poke, to update price
-    await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
-    await osm.poke();
-    await spot.poke(ILK_ETH);
-    console.log("60 mins passed. Member should bite.");
-
-    console.log("Current price: " + (await getCurrentPrice()).toString());
-
-    await increaseTime_MineBlock_Sleep(1, 10);
-
-    // It should be bitten at Bot
-    expect(true).to.be.equal(await bCdpManager.bitten(cdp));
-
-    console.log("70 mins passed, should have bitten = true");
-    await increaseTime_MineBlock_Sleep(10, 5); // ==> 70 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
-    expect(false).to.be.equal(ci.isToppedUp);
-    expect(false).to.be.equal(bi.canCallBiteNow);
-    expect(true).to.be.equal(await bCdpManager.bitten(cdp));
-
-    console.log("120 mins passed, should have bitten = false");
-    await increaseTime_MineBlock_Sleep(50, 5); // ==> 120 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
-    expect(false).to.be.equal(ci.isToppedUp);
-    expect(false).to.be.equal(bi.canCallBiteNow);
-    expect(false).to.be.equal(await bCdpManager.bitten(cdp)); // 1 hour passed
-
-    console.log("180 mins passed, should have bitten = false and no topup");
-    await increaseTime_MineBlock_Sleep(60, 5); // ==> 180 mins passed
-    [ci, bi] = await getLiquidatorInfo(cdp);
-    expect(false).to.be.equal(ci.isToppedUp);
-    expect(false).to.be.equal(bi.canCallBiteNow);
-    expect(false).to.be.equal(await bCdpManager.bitten(cdp));
+    await testSingleBite();
   });
 
   it("Test untop", async () => {
@@ -478,7 +395,115 @@ contract("Testchain", (accounts) => {
     );
     expect(true).to.be.equal(isExpectedEthGreaterThanCollateral);
   });
+
+  it("Test multiple bite", async () => {
+    const cdp = await testSingleBite();
+
+    await resetPrice();
+
+    await testSingleBite(cdp);
+  });
 });
+
+async function testSingleBite(existingCdp = 0) {
+  let ci;
+  let bi;
+  let cdp;
+
+  if (existingCdp > 0) {
+    cdp = existingCdp;
+    const urn = await bCdpManager.urns(cdp);
+    let res = await vat.urns(ILK_ETH, urn);
+
+    // re-deposit
+    const ink = new BN(2).mul(ONE_ETH); // 2 ETH
+    const newInk = ink.sub(res.ink);
+    const art = new BN(199).mul(ONE_ETH); // 199 DAI
+    await mintMoreDaiForCdp(bCdpManager, cdp, newInk, art, { from: USER_1 });
+  } else {
+    // Open new CDP and Mint
+    cdp = await mintDaiForUser(2, 199, { from: USER_1 });
+    console.log("New CDP: " + cdp + " opened");
+  }
+
+  // setNextPrice
+  await setNextPrice(new BN(145).mul(ONE_ETH));
+  await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+  await setChainlinkPrice(new BN(145));
+
+  await syncOSMTime();
+  await osm.poke();
+  await spot.poke(ILK_ETH);
+  console.log("## Current price: " + (await getCurrentPrice()).toString());
+  console.log("## Next price: " + (await getNextPrice()).toString());
+
+  // nothing should happen
+  console.log("10 mins passed. Nothing should happen for cdp.");
+  await increaseTime_MineBlock_Sleep(10, 5); // ==> 10 mins passed
+  [ci, bi] = await getLiquidatorInfo(cdp);
+  expect(false).to.be.equal(ci.isToppedUp);
+  expect(false).to.be.equal(bi.canCallBiteNow);
+
+  // member deposit, 10 mins before topup allowed
+  console.log("20 mins passed. Member should deposit now (which is 10 mins before topup allowed).");
+  await increaseTime_MineBlock_Sleep(10, 5); // ==> 20 mins passed
+  [ci, bi] = await getLiquidatorInfo(cdp);
+  expect(false).to.be.equal(ci.isToppedUp);
+  expect(false).to.be.equal(bi.canCallBiteNow);
+
+  // nothing should happen
+  console.log("40 mins passed. Nothing should happen for cdp.");
+  await increaseTime_MineBlock_Sleep(20, 5); // ==> 40 mins passed
+  [ci, bi] = await getLiquidatorInfo(cdp);
+  expect(false).to.be.equal(ci.isToppedUp);
+  expect(false).to.be.equal(bi.canCallBiteNow);
+
+  // member should topup, 10 mins before bite allowed
+  console.log("50 mins passed. Member should topup now (which is 10 mins before bite allowed).");
+  await increaseTime_MineBlock_Sleep(10, 5); // ==> 50 mins passed
+  [ci, bi] = await getLiquidatorInfo(cdp);
+  expect(true).to.be.equal(ci.isToppedUp);
+  expect(false).to.be.equal(bi.canCallBiteNow);
+
+  // member should be allowed to bite
+  await increaseTime_MineBlock_Sleep(10, 5); // ==> 60 mins passed
+
+  // After 1 hour poke, to update price
+  await real.poke(uintToBytes32(new BN(145).mul(ONE_ETH)));
+  await osm.poke();
+  await spot.poke(ILK_ETH);
+  console.log("60 mins passed. Member should bite.");
+
+  console.log("Current price: " + (await getCurrentPrice()).toString());
+
+  await increaseTime_MineBlock_Sleep(1, 10);
+
+  // It should be bitten at Bot
+  expect(true).to.be.equal(await bCdpManager.bitten(cdp));
+
+  console.log("70 mins passed, should have bitten = true");
+  await increaseTime_MineBlock_Sleep(10, 5); // ==> 70 mins passed
+  [ci, bi] = await getLiquidatorInfo(cdp);
+  expect(false).to.be.equal(ci.isToppedUp);
+  expect(false).to.be.equal(bi.canCallBiteNow);
+  expect(true).to.be.equal(await bCdpManager.bitten(cdp));
+
+  console.log("120 mins passed, should have bitten = false");
+  await increaseTime_MineBlock_Sleep(50, 5); // ==> 120 mins passed
+  [ci, bi] = await getLiquidatorInfo(cdp);
+  expect(false).to.be.equal(ci.isToppedUp);
+  expect(false).to.be.equal(bi.canCallBiteNow);
+  expect(false).to.be.equal(await bCdpManager.bitten(cdp)); // 1 hour passed
+
+  console.log("180 mins passed, should have bitten = false and no topup");
+  await increaseTime_MineBlock_Sleep(60, 5); // ==> 180 mins passed
+  [ci, bi] = await getLiquidatorInfo(cdp);
+  expect(false).to.be.equal(ci.isToppedUp);
+  expect(false).to.be.equal(bi.canCallBiteNow);
+  expect(false).to.be.equal(await bCdpManager.bitten(cdp));
+
+  return cdp;
+}
 
 async function mintDaiForWhale() {
   cdpWhale = await mintDaiFromMaker(10, 200, { from: WHALE });
@@ -618,22 +643,7 @@ async function mintDaiCustom(manager, ink, art, isMove, opt) {
     });
     await manager.open(ILK_ETH, _from, { from: _from });
 
-    // WETH.deposit()
-    await web3.eth.sendTransaction({
-      from: _from,
-      to: weth.address,
-      value: ink,
-    });
-
-    // WETH.approve()
-    await weth.approve(gemJoin.address, ink, { from: _from });
-
-    // ethJoin.join()
-    const urn = await manager.urns(cdp);
-    await gemJoin.join(urn, ink, { from: _from });
-
-    // manager.frob()
-    await manager.frob(cdp, ink, art, { from: _from });
+    await mintMoreDaiForCdp(manager, cdp, ink, art, opt);
 
     if (isMove) {
       // manager.move();
@@ -645,6 +655,27 @@ async function mintDaiCustom(manager, ink, art, isMove, opt) {
     console.log(err);
   }
   return cdp;
+}
+
+async function mintMoreDaiForCdp(manager, cdp, ink, art, opt) {
+  const _from = opt.from;
+
+  // WETH.deposit()
+  await web3.eth.sendTransaction({
+    from: _from,
+    to: weth.address,
+    value: ink,
+  });
+
+  // WETH.approve()
+  await weth.approve(gemJoin.address, ink, { from: _from });
+
+  // ethJoin.join()
+  const urn = await manager.urns(cdp);
+  await gemJoin.join(urn, ink, { from: _from });
+
+  // manager.frob()
+  await manager.frob(cdp, ink, art, { from: _from });
 }
 
 async function setNextPrice(price) {
